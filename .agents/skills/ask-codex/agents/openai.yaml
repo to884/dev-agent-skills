@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ask Codex"
+  short_description: "Codex CLI の GPT-6 Astra または GPT-6 Sol に 1 つのタスクを依頼し、最終メッセージを受け取る"
+  default_prompt: "Use $ask-codex to hand one task to GPT-6 Astra or GPT-6 Sol through the Codex CLI and bring back its final message."
