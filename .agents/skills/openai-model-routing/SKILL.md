@@ -5,7 +5,7 @@ description: Codex CLI に渡す OpenAI のモデルを GPT-6 Astra、GPT-6 Sol�
 
 # OpenAI モデルの選び分け
 
-既定は GPT-6 Astra の `medium`。作者の `~/.codex/config.toml` と OpenAI の指針に合わせた値。
+このスキルでの既定は GPT-6 Astra の `medium`。作者の `~/.codex/config.toml` と OpenAI の指針に合わせた値。委譲スクリプトの既定は `high` なので、選んだ effort を明示する（「effort の決め方」）。
 このスキルは、既定から外す理由があるかの判定と、外すときの指定方法を持つ。
 Claude 側のモデル選択は `claude-model-routing`。判定の軸は同じで、候補と経路と課金の形が違う。
 
@@ -35,16 +35,17 @@ Claude Code のセッションは GPT にならない。GPT を使うのは Code
 | ChatGPT ログイン | プランに含まれる Work と Codex の共有 allowance。5 時間窓と週窓の両方に残りが要る | こちら。`codex login status` が `Logged in using ChatGPT` |
 | API キー | トークン単価の従量 | 使っていない |
 
-allowance の消費はモデルと effort で変わる。同じタスクで Astra は GPT-5.6 Sol の約 2 倍、GPT-5.6 Luna の約 50 倍の allowance を使う（5 時間あたりの推定メッセージ数の比。`references/notes.md`）。
+allowance の消費はタスク、モデル、effort で変わる。5 時間あたりの推定メッセージ数は、Astra を 1 とすると GPT-5.6 Sol が約 2、GPT-5.6 Luna が約 50 という目安になる。同じタスクでの allowance 消費比は未確認で、このメッセージ数の比からは断定できない（`references/notes.md`）。
 モデルを切り替えても allowance は戻らない。作者のプランと残量は未確認なので、長い委譲や dispatch の `all` の前に Settings → Usage を見てもらう。
 
 単価表は API の値。ChatGPT ログインでは費用の桁の見当にだけ使い、作者への費用の説明は allowance の消費で言う。
 
 ## 制約 3：モデルを変えるとキャッシュは再利用できない
 
-OpenAI のプロンプトキャッシュもモデルごとに別で、切り替えると引き継げない。TTL は 30 分。
-Codex は `exec resume` で同じセッションを続けられる（`ask-codex` の `--resume`、`dispatch` のレビュー段階）。文脈は残るが、キャッシュは 30 分空くと切れる。
-入力が 272K トークンを超えると、そのリクエスト全体が入力とキャッシュ 2 倍、出力 1.5 倍になる。委譲する材料は 272K 未満に収める。
+OpenAI のプロンプトキャッシュもモデルごとに別で、切り替えると引き継げない。GPT-5.6 以降の API では、最後の書き込み・再利用から最低 30 分保持され、それより長く保持される場合もある。30 分を超えた再利用は保証しない。
+Codex は `exec resume` で同じセッションを続けられる（`ask-codex` の `--resume`、`dispatch` のレビュー段階）。文脈の継続とキャッシュへの命中は別で、再開だけでキャッシュの再利用を保証しない。
+
+API 従量では、リクエスト全体の入力が 272K トークンを超えると、そのリクエスト全体に入力とキャッシュ 2 倍、出力 1.5 倍の単価が適用される。割増を避けるときは、材料に加えて指示、ツール定義、再開時の履歴、実行中に増えるツール結果を含む入力総量を見積もり、余裕を持って 272K 未満に収める。材料だけを分割しても、同じセッションに履歴が積み上がれば境界を超え得る。ChatGPT ログインの allowance にも同じ倍率が適用されるかは未確認なので、この API 料金を根拠に一律の分割を要求しない。
 
 ## 判定と割り当て
 
@@ -59,7 +60,7 @@ Codex は `exec resume` で同じセッションを続けられる（`ask-codex`
 
 | 順 | モデル | ID | `ask-codex --model` | `dispatch` 記号 | $/1M 入力・出力 | 条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | GPT-6 Luna | `gpt-6-luna` | `gpt-6-luna` | 無し | 0.1・0.5 | 判断が薄く量だけが多い。受入条件が確定し、成果を機械的に検査できる。材料が 272K に収まる |
+| 1 | GPT-6 Luna | `gpt-6-luna` | `gpt-6-luna` | 無し | 0.1・0.5 | 判断が薄く量だけが多い。受入条件が確定し、成果を機械的に検査できる |
 | 2 | GPT-6 Sol | `gpt-6-sol` | `gpt-6-sol` | 無し | 2・10 | 手順が決まっていて既存のパターンを踏襲する。受入条件が確定し、成果を機械的に検査できる |
 | 3 | GPT-6 Astra | `gpt-6-astra` | `astra`（既定） | D | 10・50 | 既定。上のどれにも当てはまらない |
 
@@ -87,7 +88,7 @@ effort はモデルより先に動かす。OpenAI 自身が「Astra の `low` �
 | `ultra` | サブエージェントへ委任する形。Astra と Sol | `codex exec` で通るかは未確認 |
 
 Codex CLI では `-c model_reasoning_effort="<段>"`。`ask-codex` と `dispatch` の `--effort` は `medium|high|xhigh` に絞ってあり、既定は `high`。`low` や `max` を使うにはスクリプトの `EFFORTS` を広げるか、`codex exec` を直接呼ぶ。
-`ask-codex` の既定 `high` と `config.toml` の `medium` は食い違っている。どちらに揃えるかは作者の決定。
+両スクリプトは Codex に effort を明示して渡すため、省略すると `config.toml` の `medium` よりスクリプトの既定 `high` が優先される。このスキル経由の `ask-codex` では、別の段を選ぶ理由や作者の指定がなければ `--effort medium` を必ず明示する。`dispatch` では、実行前に対象の Codex エージェントの `effort` に `{"run":"medium","review":"medium"}` を明示する。全員に同じ段を適用する場合は `init --effort medium` でもよい。スクリプト自体の既定値は変更しない。
 
 段ごとの計測値は無い。Anthropic の曲線（`claude-model-routing`）を GPT に当てはめない。OpenAI が書いているのは次の 3 つだけ。
 
@@ -108,14 +109,14 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --mo
 
 - テストの範囲。書かないと Astra は徹底的に検証する
 - `--mode`。読むだけなら `analysis`、書かせるなら `edit`
-- 材料の総量。272K を超えるなら分ける
+- 指示、ツール定義、履歴、ツール結果を含む入力総量の見積もり。API 従量で割増を避ける場合は、前述の 272K の境界と実行中の増加を考慮して材料と履歴を絞る
 
 `high` 以上、調査、実装は `--detach` で切り離し、`wait` で受け取る。
 
 ## 経路 2：multi-agent-dispatch
 
-記号 C（GPT-5.6 Sol）と D（GPT-6 Astra）。`--agents` で絞る。`run.json` の `model` を書き換えれば GPT-6 Sol や Luna も使える。
-`--effort` は全員に同じ段がかかる。GPT だけ変えるなら `run.json` の各エージェントの `effort` を段階ごとに書く。
+記号 C（GPT-5.6 Sol）と D（GPT-6 Astra）。`--agents` で絞る。GPT-6 Sol や Luna を使うときは、実行前に `run.json` の対象エージェントの `model` と `label` を両方更新する。たとえば `model` を `gpt-6-sol`、`label` を `GPT-6 Sol` にする。`label` はログ、状態表示、総括用プロンプトに使われる。
+`init --effort` は全員の実行・レビューに同じ段がかかる（総括は別設定）。GPT だけ変えるなら `run.json` の対象エージェントの `effort` を `{"run":"medium","review":"medium"}` のように段階ごとに書く。作者が指定した段や、このスキルで理由を持って選んだ段があれば、その値を使う。
 
 ## 提案の書き方
 
@@ -126,7 +127,8 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --mo
 - Astra に `none` を指定する
 - Anthropic の effort 計測値を GPT に当てはめて書く
 - API 単価を ChatGPT ログインの費用として作者に伝える
-- 272K を超える材料をそのまま委譲する
+- API 従量の割増を避ける際に、材料だけを数えて入力総量が 272K 未満だと判断する
+- API の長文入力の割増倍率を、ChatGPT ログインの allowance にも適用されるものとして説明する
 - allowance の残りを確かめずに `xhigh` 以上や dispatch の `all` を薦める
 - `ultra` を確かめずに使えるものとして書く
 - allowance を戻す目的でモデルを切り替える提案をする
