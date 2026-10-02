@@ -1,12 +1,12 @@
 ---
 name: ask-codex
-description: Claude Code（CLI とデスクトップアプリ）から、Codex CLI の GPT-6 Astra または GPT-6 Sol に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。長い依頼は切り離して起動し、後で受け取る。
+description: Claude Code（CLI とデスクトップアプリ）から、Codex CLI の GPT-6 Astra または GPT-6.1 Sol に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。長い依頼は切り離して起動し、後で受け取る。
 ---
 
 # Codex への依頼
 
 Codex CLI（`codex exec`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
-モデルは GPT-6 Astra（既定）と GPT-6 Sol、effort は medium、high、xhigh から選ぶ。
+モデルは GPT-6 Astra（既定）と GPT-6.1 Sol、effort は medium、high、xhigh から選ぶ。
 Claude Code の CLI からもデスクトップアプリの Code タブからも、手順は同じ。
 
 ## 手順
@@ -34,7 +34,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py check
 python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --model astra --effort high
 ```
 
-- `--model sol` で GPT-6 Sol。`--effort medium|high|xhigh`（既定 high）。
+- `--model sol` で GPT-6.1 Sol。`--effort medium|high|xhigh`（既定 high）。
 - `--mode analysis`（既定）は読み取り専用。`--mode edit` は作業ツリーの編集を許す（Codex は workspace-write サンドボックス）。
 - `--out <file>` で最終メッセージをファイルにも書く。
 

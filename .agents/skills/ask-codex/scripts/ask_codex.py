@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ask-codex: Claude Code から Codex CLI の GPT-6 Astra または GPT-6 Sol に 1 つのタスクを依頼する。
+"""ask-codex: Claude Code から Codex CLI の GPT-6 Astra または GPT-6.1 Sol に 1 つのタスクを依頼する。
 
 Codex の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
@@ -33,7 +33,7 @@ NAME = "ask-codex"
 SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / "templates" / "task.md"
 
-MODELS = {"astra": ("gpt-6-astra", "GPT-6 Astra"), "sol": ("GPT-6-sol", "GPT-6 Sol")}
+MODELS = {"astra": ("gpt-6-astra", "GPT-6 Astra"), "sol": ("gpt-6.1-sol", "GPT-6.1 Sol")}
 DEFAULT_MODEL = "astra"
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"

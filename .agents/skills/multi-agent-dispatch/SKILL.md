@@ -1,6 +1,6 @@
 ---
 name: multi-agent-dispatch
-description: 1 つのタスクを Claude Code（Opus 5.5、Fable 5.1）と Codex（GPT-6 Sol、GPT-6 Astra）のエージェントへ CLI 経由で同時に依頼し、成果を集める。任意で相互レビューと総括まで続ける。設計判断、原因究明、レビュー、実装案の比較など、複数モデルの独立した見解や実装が欲しいときに使う。成果物は docs/agent-runs/ に残す。
+description: 1 つのタスクを Claude Code（Opus 5.5、Fable 5.1）と Codex（GPT-6.1 Sol、GPT-6 Astra）のエージェントへ CLI 経由で同時に依頼し、成果を集める。任意で相互レビューと総括まで続ける。設計判断、原因究明、レビュー、実装案の比較など、複数モデルの独立した見解や実装が欲しいときに使う。成果物は docs/agent-runs/ に残す。
 ---
 
 # 複数エージェントへのタスク依頼
@@ -15,7 +15,7 @@ description: 1 つのタスクを Claude Code（Opus 5.5、Fable 5.1）と Codex
 | --- | --- | --- |
 | A | Claude Code | `claude-opus-5-5`（Claude Opus 5.5） |
 | B | Claude Code | `claude-fable-5-1`（Claude Fable 5.1） |
-| C | Codex | `gpt-6-sol`（GPT-6 Sol） |
+| C | Codex | `gpt-6.1-sol`（GPT-6.1 Sol） |
 | D | Codex | `gpt-6-astra`（GPT-6 Astra） |
 
 effort は `--effort medium|high|xhigh`（既定 high）で選び、実行とレビューに使う。総括は Claude Fable 5.1 の medium で書く。
