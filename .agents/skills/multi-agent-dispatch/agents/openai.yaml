@@ -1,0 +1,4 @@
+interface:
+  display_name: "Multi-Agent Dispatch"
+  short_description: "1 つのタスクを Claude と Codex のエージェントへ同時に依頼し、成果を集める。任意で相互レビューと総括"
+  default_prompt: "Use $multi-agent-dispatch to run one task on Claude Opus 5.5, Claude Fable 5.1, GPT-6.1 Sol and GPT-6 Astra through their CLIs, collect the results under docs/agent-runs/, and optionally cross-review and synthesize."
