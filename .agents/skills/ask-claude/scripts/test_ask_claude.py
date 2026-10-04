@@ -54,7 +54,7 @@ class StreamTests(unittest.TestCase):
         original = ask._run
         ask._run = lambda cmd, prompt, cwd, timeout: (1, _line(type="result", is_error=True, result="oops", session_id="S2"), "")
         try:
-            r = ask.call_claude("claude", "m", "high", "p", Path("."), 60, "dontAsk", ["Read"])
+            r = ask.call_claude("claude", "m", "high", "p", Path("."), 60, "auto", ["Read"])
         finally:
             ask._run = original
         self.assertFalse(r.ok)

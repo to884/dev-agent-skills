@@ -34,7 +34,7 @@ python .agents/skills/ask-claude/scripts/ask_claude.py ask --task-file <path> --
 ```
 
 - `--model opus` で Claude Opus 5.5。`--effort medium|high|xhigh`（既定 high）。
-- `--mode analysis`（既定）は読み取り専用。`--mode edit` は作業ツリーの編集を許す。ビルドやテストのコマンドも許すなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。
+- `claude` は常に `--permission-mode auto`（Auto）で起動する。`--mode analysis`（既定）と `--mode edit` の違いは、事前承認する道具の範囲とプロンプトの指示だけで、権限モードは同じ。`analysis` は読み取りだけを依頼する（書き換えの禁止はプロンプトの指示であり、権限では強制しない）。`edit` は作業ツリーの編集を依頼する。ビルドやテストのコマンドも事前承認するなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。
 - `--out <file>` で最終メッセージをファイルにも書く。
 
 時間のかかる依頼（high や xhigh、調査や実装）は、シェルコマンドのタイムアウトを超える。切り離して起動し、`wait` で受け取る。
