@@ -49,7 +49,7 @@ DEFAULT_SYNTH = {"vendor": "claude", "model": "claude-fable-5-1", "label": "Clau
 DEFAULT_OUT_DIR = "docs/agent-runs"
 WORKTREE_DIR = ".agents/worktrees"
 
-# analysis モードで Claude に許す道具。読み取り専用に絞る。
+# analysis モードで Claude に事前承認する道具（読み取り系）。権限モードは auto なので、これ以外も分類器が許せば動く。
 CLAUDE_TOOLS_ANALYSIS = [
     "Read", "Glob", "Grep", "WebFetch", "WebSearch",
     "Bash(git log:*)", "Bash(git show:*)", "Bash(git diff:*)",
@@ -529,7 +529,7 @@ def cmd_init(args: argparse.Namespace) -> None:
         "agents": agents,
         "synthesis": synth,
         "claude": {
-            "permission_mode": {"analysis": "dontAsk", "implement": "acceptEdits"},
+            "permission_mode": {"analysis": "auto", "implement": "auto"},
             "allowed_tools": {"analysis": CLAUDE_TOOLS_ANALYSIS, "implement": implement_tools},
         },
         "codex": {"sandbox": {"analysis": "read-only", "implement": "workspace-write"}},

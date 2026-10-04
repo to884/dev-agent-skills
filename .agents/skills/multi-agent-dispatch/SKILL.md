@@ -59,8 +59,9 @@ python .agents/skills/multi-agent-dispatch/scripts/dispatch.py init --slug <slug
 ```
 
 `--task "<本文>"` でも渡せる。`--agents A,B,C,D` で使うエージェントを選ぶ。
-`--mode analysis`（既定）は読み取り専用で、エージェントはリポジトリを書き換えない。
-`--mode implement` では各エージェントが専用の worktree（`.agents/worktrees/<run>-<記号>`）で作業し、差分を `results/<記号>.patch` に集める。Claude にビルドやテストのコマンドを許すなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。Codex は `workspace-write` サンドボックスで動く。
+Claude は常に `--permission-mode auto`（Auto）で起動する。モードによる違いは事前承認する道具の範囲とプロンプトの指示だけである。
+`--mode analysis`（既定）はリポジトリを書き換えない依頼で、書き換えの禁止はプロンプトの指示であり、Claude の権限では強制しない。
+`--mode implement` では各エージェントが専用の worktree（`.agents/worktrees/<run>-<記号>`）で作業し、差分を `results/<記号>.patch` に集める。Claude にビルドやテストのコマンドを事前承認するなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。Codex は `workspace-write` サンドボックスで動く。
 
 ### 3. 実行
 

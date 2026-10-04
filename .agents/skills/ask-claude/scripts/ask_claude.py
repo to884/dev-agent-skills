@@ -37,7 +37,7 @@ MODELS = {"fable": ("claude-fable-5-1", "Claude Fable 5.1"), "opus": ("claude-op
 DEFAULT_MODEL = "fable"
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"
-PERMISSION = {"analysis": "dontAsk", "edit": "acceptEdits"}
+PERMISSION = {"analysis": "auto", "edit": "auto"}
 TOOLS_ANALYSIS = [
     "Read", "Glob", "Grep", "WebFetch", "WebSearch",
     "Bash(git log:*)", "Bash(git show:*)", "Bash(git diff:*)",
