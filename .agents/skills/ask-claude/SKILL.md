@@ -7,6 +7,7 @@ description: Codex から、Claude Code CLI の Claude Fable 5.1 または Claud
 
 Claude Code CLI（`claude -p`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
 モデルは Claude Fable 5.1（既定）と Claude Opus 5.5、effort は medium、high、xhigh から選ぶ。
+Fable 5.1 が利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
 
 ## 手順
 
@@ -34,6 +35,7 @@ python .agents/skills/ask-claude/scripts/ask_claude.py ask --task-file <path> --
 ```
 
 - `--model opus` で Claude Opus 5.5。`--effort medium|high|xhigh`（既定 high）。
+- Fable 5.1 が利用制限（429）で止まったら、同じ effort と mode で Opus 5.5 に切り替える。Fable がツールを呼ぶ前に止まったなら同じ依頼を最初から渡し、ツールを呼んだ後なら Fable のセッションを `--resume` で引き継いで続けさせる。切り替えたことは標準エラーに出し、`.status.json` の `fallback` に元のモデルとエラーを残す（`model` と `label` は切り替え後のものになる）。切り替えたくなければ `--no-fallback` を付ける。
 - `claude` は常に `--permission-mode auto`（Auto）で起動する。`--mode analysis`（既定）と `--mode edit` の違いは、事前承認する道具の範囲とプロンプトの指示だけで、権限モードは同じ。`analysis` は読み取りだけを依頼する（書き換えの禁止はプロンプトの指示であり、権限では強制しない）。`edit` は作業ツリーの編集を依頼する。ビルドやテストのコマンドも事前承認するなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。
 - `--out <file>` で最終メッセージをファイルにも書く。
 
@@ -55,8 +57,9 @@ python .agents/skills/ask-claude/scripts/ask_claude.py wait <file>
 ## 注意
 
 - Codex の workspace-write サンドボックスは既定でネットワークを遮断するので、`claude` の API 呼び出しが接続拒否で失敗する（実測では約 3 分待ってから落ちた）。`check` と `ask` は先に API ホストへの到達を確かめて止まる。対処は、`~/.codex/config.toml` の `[sandbox_workspace_write]` に `network_access = true` を設定する（`-c sandbox_workspace_write.network_access=true` でも可。この設定で成功を確認した）か、Codex が求める承認でサンドボックス外の実行を許可する。
-- 費用は呼び出しごとにかかる。同じ依頼を作者の指示なしに繰り返さない。
-- `--timeout` の既定は 1800 秒。超えると失敗として記録する。
+- 費用は呼び出しごとにかかる。同じ依頼を作者の指示なしに繰り返さない。Opus 5.5 への切り替えは、利用制限で止まったときにだけ自動で 1 回行う。
+- `--timeout` の既定は 1800 秒で、呼び出し 1 回ごとの上限である。超えると失敗として記録する。切り替えると合計で最長 2 倍かかる。
+- `claude` の `--fallback-model` は過負荷やモデルが使えないときの切り替えで、利用制限（429）では切り替わらない（Claude Code 2.1.289 で確認）。そのためこのスキルは自前で切り替える。
 - `claude` が PATH に無ければ `~/.local/bin/claude.exe` を使う。環境変数 `ASK_CLAUDE_EXE` で実行ファイルを指定できる。
 - Claude はリポジトリの `CLAUDE.md` を自動で読むが、このスキルのプロンプト（`templates/task.md`）はそれに依存しない。
 - 取り込み規則のテスト: `python -m unittest discover -s .agents/skills/ask-claude/scripts -p "test_*.py"`

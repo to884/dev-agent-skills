@@ -3,12 +3,13 @@
 
 Claude の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
+Fable 5.1 が利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
 
 使い方:
   python ask_claude.py check
   python ask_claude.py ask (--task <text> | --task-file <path>) [--model fable|opus] [--effort medium|high|xhigh]
                        [--mode analysis|edit] [--allow "Bash(make:*)"] [--out <file>] [--detach]
-                       [--resume <session-id>] [--cwd <dir>] [--timeout 1800]
+                       [--resume <session-id>] [--cwd <dir>] [--timeout 1800] [--no-fallback]
   python ask_claude.py wait <out> [--timeout 570]
   python ask_claude.py status <out>
 """
@@ -35,6 +36,12 @@ TEMPLATE = SKILL_DIR / "templates" / "task.md"
 
 MODELS = {"fable": ("claude-fable-5-1", "Claude Fable 5.1"), "opus": ("claude-opus-5-5", "Claude Opus 5.5")}
 DEFAULT_MODEL = "fable"
+# 利用制限で使えないときに切り替える先。キーはモデル ID、値は MODELS のキー。
+FALLBACK = {MODELS["fable"][0]: "opus"}
+CONTINUE_PROMPT = (
+    "利用制限のため、前のモデルの作業がここで止まった。ここまでの作業を引き継ぎ、最初の依頼を最後まで進めて、"
+    "最終メッセージを書く。最初の依頼の制約と出力形式に従う。"
+)
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"
 PERMISSION = {"analysis": "auto", "edit": "auto"}
@@ -205,6 +212,8 @@ class CallResult:
         self.stderr = ""
         self.usage: dict = {}
         self.returncode: int | None = None
+        self.rate_limited = False
+        self.used_tools = False
 
 
 def _kill_tree(pid: int) -> None:
@@ -289,6 +298,33 @@ def _parse_claude_stream(stdout: str) -> tuple[dict | None, str]:
     return final, joined if len(joined) >= len(fallback) else fallback
 
 
+def _stream_signals(stdout: str) -> tuple[bool, bool]:
+    """stream-json の行から（利用制限で止まったか、ツールを呼んだか）を返す。
+
+    利用制限（429）では、`claude` はアシスタントのメッセージに `"error": "rate_limit"` を付け、
+    最終イベントに `api_error_status: 429` を入れる。`--fallback-model` は 429 では切り替わらない
+    （Claude Code 2.1.289 で確認）ので、ここで見つけて呼び出し側で切り替える。
+    """
+    limited = used = False
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        kind = ev.get("type")
+        if kind == "assistant":
+            if ev.get("error") == "rate_limit":
+                limited = True
+            if any(b.get("type") == "tool_use" for b in ev.get("message", {}).get("content") or []):
+                used = True
+        elif kind == "result" and ev.get("is_error") and ev.get("api_error_status") == 429:
+            limited = True
+    return limited, used
+
+
 def call_claude(exe: str, model: str, effort: str, prompt: str, cwd: Path, timeout: int,
                 permission_mode: str, allowed_tools: list[str], resume: str | None = None) -> CallResult:
     r = CallResult()
@@ -302,6 +338,7 @@ def call_claude(exe: str, model: str, effort: str, prompt: str, cwd: Path, timeo
     if r.returncode is None:
         r.error = "timeout"
         return r
+    r.rate_limited, r.used_tools = _stream_signals(r.stdout)
     final, text = _parse_claude_stream(r.stdout)
     if final is None:
         r.error = f"JSON を読めません（returncode={r.returncode}）: {_first_line(r.stderr)[:200]}"
@@ -392,6 +429,8 @@ def cmd_ask(args: argparse.Namespace) -> None:
             child += ["--allow", args.allow]
         if args.resume:
             child += ["--resume", args.resume]
+        if args.no_fallback:
+            child.append("--no-fallback")
         logf = open(str(out) + ".log", "w", encoding="utf-8")
         kwargs: dict = {}
         if os.name == "nt":
@@ -416,6 +455,19 @@ def cmd_ask(args: argparse.Namespace) -> None:
         write_status(out, state="running", pid=os.getpid(), started=started, out=str(out), **meta)
     log(f"{label} に依頼（effort {args.effort}、{args.mode}、cwd {cwd}）")
     res = call_claude(exe, model_id, args.effort, prompt, cwd, args.timeout, PERMISSION[args.mode], tools, args.resume)
+    fallback = None
+    if not res.ok and res.rate_limited and not args.no_fallback and model_id in FALLBACK:
+        fb_id, fb_label = MODELS[FALLBACK[model_id]]
+        # ツールを呼んだ後で止まったなら、そのセッションを引き継いで続けさせる。何もしていなければ最初からやり直す。
+        carry = res.used_tools and res.session_id
+        resume, fb_prompt = (res.session_id, CONTINUE_PROMPT) if carry else (args.resume, prompt)
+        fallback = {"from": model_id, "error": res.error, "session_id": res.session_id, "usage": res.usage}
+        log(f"{label} が利用制限で使えません。{fb_label} に切り替えて{'続けます' if carry else 'やり直します'}")
+        model_id, label = fb_id, fb_label
+        meta.update(model=model_id, label=label)
+        if out is not None:
+            write_status(out, state="running", pid=os.getpid(), started=started, out=str(out), fallback=fallback, **meta)
+        res = call_claude(exe, model_id, args.effort, fb_prompt, cwd, args.timeout, PERMISSION[args.mode], tools, resume)
     finished = dt.datetime.now().isoformat(timespec="seconds")
     if out is not None:
         if res.ok:
@@ -424,7 +476,7 @@ def cmd_ask(args: argparse.Namespace) -> None:
             write_text(Path(str(out) + ".error.log"), res.stdout + "\n--- stderr ---\n" + res.stderr)
         write_status(out, state="done" if res.ok else "failed", pid=os.getpid(), started=started,
                      finished=finished, out=str(out), session_id=res.session_id, usage=res.usage,
-                     error=res.error, **meta)
+                     error=res.error, fallback=fallback, **meta)
     if not res.ok:
         log(f"失敗: {res.error}")
         if out is None:
@@ -432,7 +484,7 @@ def cmd_ask(args: argparse.Namespace) -> None:
         raise SystemExit(1)
     sys.stdout.write(res.text.rstrip() + "\n")
     sys.stdout.flush()
-    log(f"完了。session {res.session_id}  usage {json.dumps(res.usage, ensure_ascii=False)}")
+    log(f"完了（{label}）。session {res.session_id}  usage {json.dumps(res.usage, ensure_ascii=False)}")
 
 
 def cmd_wait(args: argparse.Namespace) -> None:
@@ -455,7 +507,7 @@ def cmd_wait(args: argparse.Namespace) -> None:
     if st["state"] == "done":
         sys.stdout.write(read_text(out))
         sys.stdout.flush()
-        log(f"完了。session {st.get('session_id')}  usage {json.dumps(st.get('usage'), ensure_ascii=False)}")
+        log(f"完了（{st.get('label')}）。session {st.get('session_id')}  usage {json.dumps(st.get('usage'), ensure_ascii=False)}")
         return
     raise SystemExit(f"失敗しました: {st.get('error')}。詳細は {out}.log と {out}.error.log を見てください。")
 
@@ -491,6 +543,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--resume", help="続きを聞くセッション ID（同じ作業ディレクトリから呼ぶ）")
     p.add_argument("--cwd", help="Claude の作業ディレクトリ（既定は現在のディレクトリ）")
     p.add_argument("--timeout", type=int, default=1800, help="呼び出しの上限秒数（既定 1800）")
+    p.add_argument("--no-fallback", action="store_true", help="Fable 5.1 が利用制限で使えなくても Opus 5.5 に切り替えない")
     p.set_defaults(func=cmd_ask)
 
     p = sub.add_parser("wait", help="切り離した依頼の完了を待ち、最終メッセージを出す")

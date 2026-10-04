@@ -4,7 +4,9 @@
     python -m unittest discover -s .agents/skills/ask-claude/scripts -p "test_*.py"
 """
 
+import contextlib
 import importlib.util
+import io
 import json
 import unittest
 from pathlib import Path
@@ -59,6 +61,80 @@ class StreamTests(unittest.TestCase):
             ask._run = original
         self.assertFalse(r.ok)
         self.assertIn("oops", r.error)
+
+
+class FallbackTests(unittest.TestCase):
+    def _limited(self, tool=False):
+        events = [_assistant(_tool_use())] if tool else []
+        events += [_line(type="assistant", error="rate_limit", message={"content": [_text("You've hit your limit")]}),
+                   _line(type="result", is_error=True, api_error_status=429, result="You've hit your limit",
+                         session_id="S1")]
+        return "\n".join(events)
+
+    def test_stream_signals(self):
+        self.assertEqual(ask._stream_signals(self._limited()), (True, False))
+        self.assertEqual(ask._stream_signals(self._limited(tool=True)), (True, True))
+        only_result = _line(type="result", is_error=True, api_error_status=429, result="x")
+        self.assertEqual(ask._stream_signals(only_result), (True, False))
+        ok = "\n".join([_assistant(_tool_use()), _assistant(_text("本文")), _result("本文")])
+        self.assertEqual(ask._stream_signals(ok), (False, True))
+        other = _line(type="result", is_error=True, api_error_status=500, result="x")
+        self.assertEqual(ask._stream_signals(other), (False, False))
+
+    def _ask(self, outputs, *argv):
+        """CLI の起動（_run と preflight）を差し替えて ask を走らせ、各呼び出しの（モデル、プロンプト、resume）を返す。"""
+        calls = []
+        originals = ask._run, ask.preflight
+
+        def fake_run(cmd, prompt, cwd, timeout):
+            calls.append((cmd[cmd.index("--model") + 1], prompt, cmd[cmd.index("--resume") + 1] if "--resume" in cmd else None))
+            return 0, outputs[len(calls) - 1], ""
+
+        ask._run, ask.preflight = fake_run, lambda: "claude"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                try:
+                    ask.main(["ask", "--task", "依頼本文", *argv])
+                    code = 0
+                except SystemExit as e:
+                    code = e.code
+        finally:
+            ask._run, ask.preflight = originals
+        return calls, code
+
+    def test_falls_back_to_opus_from_scratch(self):
+        ok = "\n".join([_assistant(_text("本文")), _result("本文")])
+        calls, code = self._ask([self._limited(), ok])
+        self.assertEqual(code, 0)
+        self.assertEqual([c[0] for c in calls], ["claude-fable-5-1", "claude-opus-5-5"])
+        self.assertEqual(calls[0][1], calls[1][1])
+        self.assertIsNone(calls[1][2])
+
+    def test_falls_back_by_resuming_after_tool_use(self):
+        ok = "\n".join([_assistant(_text("本文")), _result("本文")])
+        calls, code = self._ask([self._limited(tool=True), ok])
+        self.assertEqual(code, 0)
+        self.assertEqual(calls[1][0], "claude-opus-5-5")
+        self.assertEqual(calls[1][1], ask.CONTINUE_PROMPT)
+        self.assertEqual(calls[1][2], "S1")
+
+    def test_no_fallback_for_opus_flag_or_other_errors(self):
+        self.assertEqual(len(self._ask([self._limited()], "--model", "opus")[0]), 1)
+        self.assertEqual(len(self._ask([self._limited()], "--no-fallback")[0]), 1)
+        other = _line(type="result", is_error=True, api_error_status=500, result="x", session_id="S1")
+        calls, code = self._ask([other])
+        self.assertEqual((len(calls), code), (1, 1))
+
+    def test_status_records_fallback(self):
+        import tempfile
+        ok = "\n".join([_assistant(_text("本文")), _result("本文")])
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "answer.md"
+            self._ask([self._limited(), ok], "--out", str(out))
+            st = ask.read_status(out)
+        self.assertEqual(st["state"], "done")
+        self.assertEqual(st["model"], "claude-opus-5-5")
+        self.assertEqual(st["fallback"]["from"], "claude-fable-5-1")
 
 
 class AuthAndModelTests(unittest.TestCase):
