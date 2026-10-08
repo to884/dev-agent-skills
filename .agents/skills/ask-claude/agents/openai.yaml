@@ -1,4 +1,4 @@
 interface:
   display_name: "Ask Claude"
-  short_description: "Claude Code CLI の Claude Fable 5.1 または Claude Opus 5.5 に 1 つのタスクを依頼し、最終メッセージを受け取る"
-  default_prompt: "Use $ask-claude to hand one task to Claude Fable 5.1 or Claude Opus 5.5 through the Claude Code CLI and bring back its final message."
+  short_description: "Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼し、最終メッセージを受け取る"
+  default_prompt: "Use $ask-claude to hand one task to Claude Opus 5.5 or Claude Fable 5.1 through the Claude Code CLI and bring back its final message."

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""ask-claude: Codex から Claude Code CLI の Claude Fable 5.1 または Claude Opus 5.5 に 1 つのタスクを依頼する。
+"""ask-claude: Codex から Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼する。
 
 Claude の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
-Fable 5.1 が利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
+既定は Opus 5.5。Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
 
 使い方:
   python ask_claude.py check
-  python ask_claude.py ask (--task <text> | --task-file <path>) [--model fable|opus] [--effort medium|high|xhigh]
+  python ask_claude.py ask (--task <text> | --task-file <path>) [--model opus|fable] [--effort medium|high|xhigh]
                        [--mode analysis|edit] [--allow "Bash(make:*)"] [--out <file>] [--detach]
                        [--resume <session-id>] [--cwd <dir>] [--timeout 1800] [--no-fallback]
   python ask_claude.py wait <out> [--timeout 570]
@@ -35,7 +35,7 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / "templates" / "task.md"
 
 MODELS = {"fable": ("claude-fable-5-1", "Claude Fable 5.1"), "opus": ("claude-opus-5-5", "Claude Opus 5.5")}
-DEFAULT_MODEL = "fable"
+DEFAULT_MODEL = "opus"
 # 利用制限で使えないときに切り替える先。キーはモデル ID、値は MODELS のキー。
 FALLBACK = {MODELS["fable"][0]: "opus"}
 CONTINUE_PROMPT = (

@@ -1,13 +1,13 @@
 ---
 name: ask-claude
-description: Codex から、Claude Code CLI の Claude Fable 5.1 または Claude Opus 5.5 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。長い依頼は切り離して起動し、後で受け取る。
+description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。長い依頼は切り離して起動し、後で受け取る。
 ---
 
 # Claude への依頼
 
 Claude Code CLI（`claude -p`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
-モデルは Claude Fable 5.1（既定）と Claude Opus 5.5、effort は medium、high、xhigh から選ぶ。
-Fable 5.1 が利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
+モデルは Claude Opus 5.5（既定）と Claude Fable 5.1、effort は medium、high、xhigh から選ぶ。
+Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
 
 ## 手順
 
@@ -31,10 +31,10 @@ python .agents/skills/ask-claude/scripts/ask_claude.py check
 数分で終わる依頼は、そのまま呼んで標準出力から受け取る。
 
 ```powershell
-python .agents/skills/ask-claude/scripts/ask_claude.py ask --task-file <path> --model fable --effort high
+python .agents/skills/ask-claude/scripts/ask_claude.py ask --task-file <path> --effort high
 ```
 
-- `--model opus` で Claude Opus 5.5。`--effort medium|high|xhigh`（既定 high）。
+- 既定は Claude Opus 5.5。`--model fable` で Claude Fable 5.1。`--effort medium|high|xhigh`（既定 high）。
 - Fable 5.1 が利用制限（429）で止まったら、同じ effort と mode で Opus 5.5 に切り替える。Fable がツールを呼ぶ前に止まったなら同じ依頼を最初から渡し、ツールを呼んだ後なら Fable のセッションを `--resume` で引き継いで続けさせる。切り替えたことは標準エラーに出し、`.status.json` の `fallback` に元のモデルとエラーを残す（`model` と `label` は切り替え後のものになる）。切り替えたくなければ `--no-fallback` を付ける。
 - `claude` は常に `--permission-mode auto`（Auto）で起動する。`--mode analysis`（既定）と `--mode edit` の違いは、事前承認する道具の範囲とプロンプトの指示だけで、権限モードは同じ。`analysis` は読み取りだけを依頼する（書き換えの禁止はプロンプトの指示であり、権限では強制しない）。`edit` は作業ツリーの編集を依頼する。ビルドやテストのコマンドも事前承認するなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。
 - `--out <file>` で最終メッセージをファイルにも書く。
