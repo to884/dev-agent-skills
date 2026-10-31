@@ -21,7 +21,7 @@ license: CC-BY-4.0
 ## ブランチ名
 
 形式は `<type>/<short-description>` で、type は feature、fix、hotfix、refactor、chore、docs、test のいずれかである。
-小文字とハイフンだけを使い、説明は 5 語から 7 語までにする。
+小文字とハイフンだけを使い、説明は 7 語までにする。
 バックログの ID は `feature/b-390-stage1-overlay-shell` のように含めてよい。Issue 番号は求められたときだけ含める。
 道具が自動で付けた名前（Claude Code の `claude/<slug>-<hash>`、Codex の `codex/<slug>`）はそのまま使い、改名を提案しない。
 利用者が非準拠の名前を出したら、準拠する名前を添えて提案する。
@@ -69,7 +69,7 @@ license: CC-BY-4.0
 ## プルリクエスト
 
 - タイトルは Conventional Commits 形式で、主要なコミットの type と一致させる
-- 説明は `.github/pull_request_template.md` の節に沿って書く
+- 説明は `.github/pull_request_template.md` があればその節に沿って書く。無ければ、何を変えたか、なぜ変えたか、どう確かめたかを書く
 - タイトルとコミット履歴が食い違っていたら指摘する
 
 ## 履歴

@@ -35,7 +35,7 @@ Claude Code のセッションは GPT にならない。GPT を使うのは Code
 | ChatGPT ログイン | プランに含まれる Work と Codex の共有 allowance。5 時間窓と週窓の両方に残りが要る | こちら。`codex login status` が `Logged in using ChatGPT` |
 | API キー | トークン単価の従量 | 使っていない |
 
-allowance の消費はタスク、モデル、effort で変わる。GPT-6 Sol（旧モデル）の推定メッセージ数は Astra を 1 とすると約 2、GPT-6 Luna は約 50 という目安だった。GPT-6.1 Sol の推定値と、同じタスクでの allowance 消費比は未確認（`references/notes.md`）。
+allowance の消費はタスク、モデル、effort で変わる。OpenAI Help の推定メッセージ数は GPT-6 Astra と GPT-5.6 系の分だけで、GPT-6 Luna と GPT-6.1 Sol の推定値、同じタスクでの allowance 消費比は未確認（`references/notes.md`）。
 モデルを切り替えても allowance は戻らない。作者のプランと残量は未確認なので、長い委譲や dispatch の `all` の前に Settings → Usage を見てもらう。
 
 単価表は API の値。ChatGPT ログインでは費用の桁の見当にだけ使い、作者への費用の説明は allowance の消費で言う。
