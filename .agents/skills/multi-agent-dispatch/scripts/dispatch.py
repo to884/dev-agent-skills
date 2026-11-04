@@ -2,7 +2,7 @@
 """multi-agent-dispatch のオーケストレーター。
 
 同じタスクを最大 4 体のエージェント（Claude Opus 5.5、Claude Fable 5.1、GPT-6.1 Sol、GPT-6 Astra）に
-`claude -p` と `codex exec` で独立に解かせ、成果を集める。任意で相互レビューと総括を続ける。
+`claude -p` と `codex exec` で独立に解かせ、成果を集める。任意で敵対的な相互レビューと総括を続ける。
 
 各 CLI の最終メッセージは標準出力の JSON ストリームから組み立て、全エージェントが終わってから
 初めてファイルへ書く。途中で他のエージェントの成果がリポジトリに現れないようにするためである。
@@ -756,7 +756,7 @@ def main(argv: list[str] | None = None) -> None:
 
     for name, fn, help_ in (
         ("run", cmd_run, "エージェントを同時に走らせ、成果を results/ に集める"),
-        ("review", cmd_review, "各エージェントに他の成果をレビューさせる"),
+        ("review", cmd_review, "各エージェントに他の成果を敵対的にレビューさせる"),
     ):
         p = sub.add_parser(name, help=help_)
         p.add_argument("run_dir")
