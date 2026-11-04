@@ -262,11 +262,14 @@ def _run(cmd: list[str], prompt: str, cwd: Path, timeout: int) -> tuple[int | No
 
 
 def call_codex(exe: str, model: str, effort: str, prompt: str, cwd: Path, timeout: int,
-               sandbox: str, resume: str | None = None) -> CallResult:
+               sandbox: str, resume: str | None = None, sandbox_on_resume: bool = False) -> CallResult:
     r = CallResult()
     common = ["-c", f'model_reasoning_effort="{effort}"', "-c", 'approval_policy="never"', "--json"]
     if resume:
-        # exec resume は -s / -C を持たず、元のセッションの設定を引き継ぐ。
+        # exec resume は -s / -C を持たず、元のセッションの設定を引き継ぐ。review は編集用セッションの
+        # 続きでも書き込めないように、サンドボックスを設定の上書き（-c）で明示する。
+        if sandbox_on_resume:
+            common += ["-c", f'sandbox_mode="{sandbox}"']
         cmd = [exe, "exec", "resume", *common, "-m", model, resume, "-"]
     else:
         cmd = [exe, "exec", *common, "-m", model, "-s", sandbox, "-C", str(cwd), "-"]
@@ -423,6 +426,7 @@ def _call_child_args(args: argparse.Namespace, model_id: str, out: Path, cwd: Pa
 
 def _spawn_detached(subcmd: str, child_args: list[str], out: Path, cwd: Path, meta: dict, started: str) -> None:
     child = [sys.executable, str(Path(__file__).resolve()), subcmd, *child_args]
+    out.parent.mkdir(parents=True, exist_ok=True)  # 既定の一時ディレクトリや --out の親が無くても起動できるように
     logf = open(str(out) + ".log", "w", encoding="utf-8")
     kwargs: dict = {}
     if os.name == "nt":
@@ -431,6 +435,7 @@ def _spawn_detached(subcmd: str, child_args: list[str], out: Path, cwd: Path, me
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(child, stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT,
                             cwd=str(cwd), env=child_env(), close_fds=True, **kwargs)
+    logf.close()  # 子は自分の複製を持つ。親が握ったままだとファイルを消せない
     write_status(out, state="running", pid=proc.pid, started=started, out=str(out), **meta)
     script = Path(__file__).resolve()
     print(f"[{NAME}] 切り離して起動しました。pid {proc.pid}、{meta['label']}、effort {meta['effort']}、{meta['mode']}")
@@ -446,7 +451,8 @@ def _execute(args: argparse.Namespace, prompt: str, mode: str, out: Path | None,
         write_status(out, state="running", pid=os.getpid(), started=started, out=str(out), **meta)
     what = "敵対的レビューを依頼" if meta["kind"] == "review" else "依頼"
     log(f"{meta['label']} に{what}（effort {meta['effort']}、{mode}、cwd {cwd}）")
-    res = call_codex(exe, meta["model"], meta["effort"], prompt, cwd, args.timeout, SANDBOX[mode], args.resume)
+    res = call_codex(exe, meta["model"], meta["effort"], prompt, cwd, args.timeout, SANDBOX[mode], args.resume,
+                     sandbox_on_resume=meta["kind"] == "review")
     finished = dt.datetime.now().isoformat(timespec="seconds")
     if out is not None:
         if res.ok:

@@ -166,6 +166,11 @@ class AskCommandTests(unittest.TestCase):
                 self.assertEqual(Path(child[child.index("--task-file") + 1]).read_text(encoding="utf-8"), "依頼本文")
         finally:
             ask._spawn_detached = original
+    def test_resumed_ask_keeps_the_session_sandbox(self):
+        cmd, _ = self._ask("--resume", "S1")[0]
+        self.assertIn("resume", cmd)
+        self.assertFalse(any(a.startswith("sandbox_mode=") for a in cmd))
+
 
 
 class ReviewCommandTests(unittest.TestCase):
@@ -262,6 +267,36 @@ class ReviewCommandTests(unittest.TestCase):
         prompt = calls[0][1]
         for part in ("+1", "`git diff HEAD`", "- `a.py`", "目的の説明"):
             self.assertIn(part, prompt)
+
+    def test_detach_creates_missing_output_directory(self):
+        out = self.dir / "new" / "nested" / "review.md"
+        started = []
+        original = ask.subprocess.Popen
+
+        class FakeProc:
+            pid = 4321
+
+        def fake_popen(cmd, **kw):
+            started.append(cmd)
+            return FakeProc()
+
+        ask.subprocess.Popen = fake_popen
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                ask._spawn_detached("review", ["--target", "a.py"], out, self.dir,
+                                    {"label": "m", "effort": "high", "mode": "analysis"}, "t")
+        finally:
+            ask.subprocess.Popen = original
+        self.assertEqual(started[0][2:4], ["review", "--target"])
+        self.assertTrue(Path(str(out) + ".log").exists())
+        self.assertEqual(ask.read_status(out)["pid"], 4321)
+
+    def test_resumed_review_forces_read_only(self):
+        calls, code = self._review("--target", "a.py", "--resume", "S1")
+        self.assertEqual(code, 0)
+        cmd = calls[0][0]
+        self.assertIn("resume", cmd)
+        self.assertIn('sandbox_mode="read-only"', cmd)
 
 
 

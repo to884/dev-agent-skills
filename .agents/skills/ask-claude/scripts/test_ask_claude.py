@@ -307,6 +307,29 @@ class ReviewCommandTests(unittest.TestCase):
         for part in ("+1", "`git diff HEAD`", "- `a.py`", "目的の説明"):
             self.assertIn(part, prompt)
 
+    def test_detach_creates_missing_output_directory(self):
+        out = self.dir / "new" / "nested" / "review.md"
+        started = []
+        original = ask.subprocess.Popen
+
+        class FakeProc:
+            pid = 4321
+
+        def fake_popen(cmd, **kw):
+            started.append(cmd)
+            return FakeProc()
+
+        ask.subprocess.Popen = fake_popen
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                ask._spawn_detached("review", ["--target", "a.py"], out, self.dir,
+                                    {"label": "m", "effort": "high", "mode": "analysis"}, "t")
+        finally:
+            ask.subprocess.Popen = original
+        self.assertEqual(started[0][2:4], ["review", "--target"])
+        self.assertTrue(Path(str(out) + ".log").exists())
+        self.assertEqual(ask.read_status(out)["pid"], 4321)
+
 
 
 class BuildTargetTests(unittest.TestCase):

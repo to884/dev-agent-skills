@@ -470,6 +470,7 @@ def _call_child_args(args: argparse.Namespace, model_id: str, out: Path, cwd: Pa
 
 def _spawn_detached(subcmd: str, child_args: list[str], out: Path, cwd: Path, meta: dict, started: str) -> None:
     child = [sys.executable, str(Path(__file__).resolve()), subcmd, *child_args]
+    out.parent.mkdir(parents=True, exist_ok=True)  # 既定の一時ディレクトリや --out の親が無くても起動できるように
     logf = open(str(out) + ".log", "w", encoding="utf-8")
     kwargs: dict = {}
     if os.name == "nt":
@@ -478,6 +479,7 @@ def _spawn_detached(subcmd: str, child_args: list[str], out: Path, cwd: Path, me
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(child, stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT,
                             cwd=str(cwd), env=child_env(), close_fds=True, **kwargs)
+    logf.close()  # 子は自分の複製を持つ。親が握ったままだとファイルを消せない
     write_status(out, state="running", pid=proc.pid, started=started, out=str(out), **meta)
     script = Path(__file__).resolve()
     print(f"[{NAME}] 切り離して起動しました。pid {proc.pid}、{meta['label']}、effort {meta['effort']}、{meta['mode']}")

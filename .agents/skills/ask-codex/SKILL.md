@@ -69,7 +69,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py review --diff main..HEAD --
 - `--diff [REV]` は `git diff REV`（REV を省くと `git diff HEAD`。ステージ済みと未ステージの変更）を取り込み、プロンプトに埋め込む。未追跡のファイルは含まないので、新しいファイルは `--target` で指定する。取り込んだ差分は `<out>.target.diff` に残す（`--out` が無ければ `%TEMP%\ask-codex\` の下。置き場所は標準エラーに出す）。200 KB を超える差分は埋め込まず、そのファイルを読ませる。
 - `--target` と `--diff` は一緒に使える。どちらも無ければ止まる。
 - `--task` / `--task-file` で、対象が果たすべき目的を渡す（任意）。省くと、レビュアーは目的を仮定し、仮定であることを書く。
-- 常に読み取り専用で走る。`--mode` は無く、Codex は read-only サンドボックスで動く。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout` は `ask` と同じで、切り離したら `wait` で受け取る。
+- 常に読み取り専用で走る。`--mode` は無く、Codex は read-only サンドボックスで動く。`--resume` で再開するときも、元のセッションの設定を `-c sandbox_mode="read-only"` で上書きする。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout` は `ask` と同じで、切り離したら `wait` で受け取る。
 
 最終メッセージは `## 判定`（採用可、条件付きで採用可、却下と確信度）、`## 致命的・重大な欠陥`、`## 崩れる前提`、`## 見落としと軽微な問題`、`## 検証した事実`、`## 崩せなかった点` の順に並ぶ。
 指摘は根拠を確かめてから採る。「推測」と書かれた指摘は、確かめるまで採らない。
