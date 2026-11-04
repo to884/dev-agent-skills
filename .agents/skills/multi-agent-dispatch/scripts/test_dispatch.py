@@ -176,6 +176,21 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("2 体の成果", rendered[1])
         self.assertIn("エージェント A、エージェント B、エージェント C", rendered[2])
 
+    def test_review_is_adversarial(self):
+        # レビューは成果を壊す役割で、長所や順位を書かせない。見つからなければそう書かせる
+        run = {"agents": {"A": {}, "B": {}, "C": {}}}
+        review = dispatch.render("review.md", TASK="t", RESULTS="r", RUN_DIR="d", **dispatch.agent_vars(run))
+        for heading in ("## エージェント X への攻撃", "### 判定", "### 致命的・重大な欠陥", "### 崩れる前提",
+                        "### 検証した事実", "### 崩せなかった点", "## 自分の成果の見直し", "## 生き残った案と確信度"):
+            self.assertIn(f"`{heading}`", review)
+        self.assertIn("「崩せなかった」と書く", review)
+        self.assertNotIn("長所", review)
+        self.assertNotIn("順位", review)
+        synthesis = dispatch.render("synthesis.md", TASK="t", RESULTS="r", REVIEWS="v", AGENT_TABLE="tbl",
+                                    **dispatch.agent_vars(run))
+        self.assertIn("敵対的にレビュー", synthesis)
+        self.assertIn("反証されていない攻撃", synthesis)
+
 
 if __name__ == "__main__":
     unittest.main()
