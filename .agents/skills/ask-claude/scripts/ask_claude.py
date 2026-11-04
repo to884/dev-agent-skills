@@ -3,12 +3,16 @@
 
 Claude の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
+review は、指定したファイルや差分を壊すことを役割とする敵対的レビューを、読み取り専用で頼む。
 既定は Opus 5.5。Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
 
 使い方:
   python ask_claude.py check
   python ask_claude.py ask (--task <text> | --task-file <path>) [--model opus|fable] [--effort medium|high|xhigh]
                        [--mode analysis|edit] [--allow "Bash(make:*)"] [--out <file>] [--detach]
+                       [--resume <session-id>] [--cwd <dir>] [--timeout 1800] [--no-fallback]
+  python ask_claude.py review [--target <path> ...] [--diff [REV]] [--task <text> | --task-file <path>]
+                       [--model opus|fable] [--effort medium|high|xhigh] [--out <file>] [--detach]
                        [--resume <session-id>] [--cwd <dir>] [--timeout 1800] [--no-fallback]
   python ask_claude.py wait <out> [--timeout 570]
   python ask_claude.py status <out>
@@ -20,6 +24,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import shutil
 import socket
 import string
@@ -33,6 +38,9 @@ from pathlib import Path
 NAME = "ask-claude"
 SKILL_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL_DIR / "templates" / "task.md"
+TEMPLATE_REVIEW = SKILL_DIR / "templates" / "adversarial.md"
+DIFF_INLINE_LIMIT = 200_000  # 差分をプロンプトへ埋め込む上限（バイト）。超えたらファイルを読ませる。
+NO_INTENT = "（指定なし。対象から読み取れる目的を仮定し、仮定であることを書く）"
 
 MODELS = {"fable": ("claude-fable-5-1", "Claude Fable 5.1"), "opus": ("claude-opus-5-5", "Claude Opus 5.5")}
 DEFAULT_MODEL = "opus"
@@ -366,9 +374,9 @@ def mode_note(mode: str) -> str:
     return "- 調査と判断の依頼である。リポジトリのファイルを書き換えない。読むための道具は使える。"
 
 
-def build_prompt(task: str, mode: str) -> str:
-    tpl = string.Template(read_text(TEMPLATE))
-    return tpl.safe_substitute(TASK=task.strip(), MODE_NOTE=mode_note(mode))
+def build_prompt(task: str, mode: str, template: Path = TEMPLATE, **extra: str) -> str:
+    tpl = string.Template(read_text(template))
+    return tpl.safe_substitute(TASK=task.strip(), MODE_NOTE=mode_note(mode), **extra)
 
 
 def status_path(out: Path) -> Path:
@@ -398,63 +406,102 @@ def _pid_alive(pid: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# 敵対的レビューの対象
+# ---------------------------------------------------------------------------
+
+def capture_diff(rev: str, cwd: Path) -> str:
+    """`git diff <rev>` を取り込む。作業ツリーが後で変わっても、同じ差分をレビューさせるため。"""
+    proc = subprocess.run(["git", "diff", rev], cwd=str(cwd), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        raise SystemExit(f"git diff {rev} に失敗しました: {_first_line(proc.stderr)}")
+    return proc.stdout
+
+
+def _fence(text: str) -> str:
+    """本文に含まれるどのバッククォートの連なりより長いフェンス。Markdown の差分で囲みが壊れないように。"""
+    longest = max((len(m) for m in re.findall(r"`+", text)), default=0)
+    return "`" * max(3, longest + 1)
+
+
+def build_target(targets: list[str], diff_text: str | None, diff_label: str, diff_path: Path | None) -> str:
+    """プロンプトの「レビューの対象」節。ファイルはパスだけを書いて読ませ、差分は埋め込む。"""
+    parts = []
+    if targets:
+        parts.append("次のファイルとディレクトリを、自分で読んでレビューする。\n\n"
+                     + "\n".join(f"- `{t}`" for t in targets))
+    if diff_text is not None:
+        if len(diff_text.encode("utf-8")) <= DIFF_INLINE_LIMIT:
+            fence = _fence(diff_text)
+            parts.append(f"次の差分（`{diff_label}`）をレビューする。\n\n{fence}diff\n{diff_text.rstrip()}\n{fence}")
+        else:
+            parts.append(f"差分（`{diff_label}`）が大きいので、`{diff_path}` を直接読んでレビューする。")
+    return "\n\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # サブコマンド
 # ---------------------------------------------------------------------------
 
-def _read_task(args: argparse.Namespace) -> str:
+def _read_task(args: argparse.Namespace, required: bool = True) -> str:
     if args.task_file:
         return read_text(Path(args.task_file))
     if args.task:
         return args.task
-    raise SystemExit("--task か --task-file のどちらかを指定してください。")
+    if required:
+        raise SystemExit("--task か --task-file のどちらかを指定してください。")
+    return ""
 
 
-def cmd_ask(args: argparse.Namespace) -> None:
-    model_id, label = resolve_model(args.model)
-    task = _read_task(args)
-    cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
-    out = Path(args.out).resolve() if args.out else None
-    started = dt.datetime.now().isoformat(timespec="seconds")
-    meta = {"model": model_id, "label": label, "effort": args.effort, "mode": args.mode, "cwd": str(cwd)}
+def default_out() -> Path:
+    return Path(tempfile.gettempdir()) / NAME / f"{dt.datetime.now():%Y%m%d-%H%M%S}.md"
 
-    if args.detach:
-        if out is None:
-            out = Path(tempfile.gettempdir()) / NAME / f"{dt.datetime.now():%Y%m%d-%H%M%S}.md"
-        task_path = Path(str(out) + ".task.md")
-        write_text(task_path, task)
-        child = [sys.executable, str(Path(__file__).resolve()), "ask", "--task-file", str(task_path),
-                 "--model", model_id, "--effort", args.effort, "--mode", args.mode,
-                 "--out", str(out), "--cwd", str(cwd), "--timeout", str(args.timeout)]
-        if args.allow:
-            child += ["--allow", args.allow]
-        if args.resume:
-            child += ["--resume", args.resume]
-        if args.no_fallback:
-            child.append("--no-fallback")
-        logf = open(str(out) + ".log", "w", encoding="utf-8")
-        kwargs: dict = {}
-        if os.name == "nt":
-            kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs["start_new_session"] = True
-        proc = subprocess.Popen(child, stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT,
-                                cwd=str(cwd), env=child_env(), close_fds=True, **kwargs)
-        write_status(out, state="running", pid=proc.pid, started=started, out=str(out), **meta)
-        script = Path(__file__).resolve()
-        print(f"[{NAME}] 切り離して起動しました。pid {proc.pid}、{label}、effort {args.effort}、{args.mode}")
-        print(f"[{NAME}] 結果: {out}")
-        print(f"[{NAME}] 受け取る: python \"{script}\" wait \"{out}\"")
-        return
 
+def _call_child_args(args: argparse.Namespace, model_id: str, out: Path, cwd: Path) -> list[str]:
+    """切り離した子プロセスへ渡す、ask と review に共通の引数。"""
+    child = ["--model", model_id, "--effort", args.effort, "--out", str(out), "--cwd", str(cwd),
+             "--timeout", str(args.timeout)]
+    if args.resume:
+        child += ["--resume", args.resume]
+    if args.no_fallback:
+        child.append("--no-fallback")
+    return child
+
+
+def _spawn_detached(subcmd: str, child_args: list[str], out: Path, cwd: Path, meta: dict, started: str) -> None:
+    child = [sys.executable, str(Path(__file__).resolve()), subcmd, *child_args]
+    logf = open(str(out) + ".log", "w", encoding="utf-8")
+    kwargs: dict = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    proc = subprocess.Popen(child, stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT,
+                            cwd=str(cwd), env=child_env(), close_fds=True, **kwargs)
+    write_status(out, state="running", pid=proc.pid, started=started, out=str(out), **meta)
+    script = Path(__file__).resolve()
+    print(f"[{NAME}] 切り離して起動しました。pid {proc.pid}、{meta['label']}、effort {meta['effort']}、{meta['mode']}")
+    print(f"[{NAME}] 結果: {out}")
+    print(f"[{NAME}] 受け取る: python \"{script}\" wait \"{out}\"")
+
+
+def _execute(args: argparse.Namespace, prompt: str, mode: str, out: Path | None, cwd: Path,
+             meta: dict, started: str) -> None:
+    """Claude を呼び、最終メッセージを標準出力（と out）に書く。ask と review が共有する。
+
+    Fable 5.1 が利用制限で止まったら、Opus 5.5 に切り替える。
+    """
     exe = preflight()
-    prompt = build_prompt(task, args.mode)
-    tools = list(TOOLS_EDIT if args.mode == "edit" else TOOLS_ANALYSIS)
-    if args.allow:
-        tools += [t.strip() for t in args.allow.split(",") if t.strip()]
+    model_id, label = meta["model"], meta["label"]
+    tools = list(TOOLS_EDIT if mode == "edit" else TOOLS_ANALYSIS)
+    allow = getattr(args, "allow", None)
+    if allow:
+        tools += [t.strip() for t in allow.split(",") if t.strip()]
     if out is not None:
         write_status(out, state="running", pid=os.getpid(), started=started, out=str(out), **meta)
-    log(f"{label} に依頼（effort {args.effort}、{args.mode}、cwd {cwd}）")
-    res = call_claude(exe, model_id, args.effort, prompt, cwd, args.timeout, PERMISSION[args.mode], tools, args.resume)
+    what = "敵対的レビューを依頼" if meta["kind"] == "review" else "依頼"
+    log(f"{label} に{what}（effort {args.effort}、{mode}、cwd {cwd}）")
+    res = call_claude(exe, model_id, args.effort, prompt, cwd, args.timeout, PERMISSION[mode], tools, args.resume)
     fallback = None
     if not res.ok and res.rate_limited and not args.no_fallback and model_id in FALLBACK:
         fb_id, fb_label = MODELS[FALLBACK[model_id]]
@@ -467,7 +514,7 @@ def cmd_ask(args: argparse.Namespace) -> None:
         meta.update(model=model_id, label=label)
         if out is not None:
             write_status(out, state="running", pid=os.getpid(), started=started, out=str(out), fallback=fallback, **meta)
-        res = call_claude(exe, model_id, args.effort, fb_prompt, cwd, args.timeout, PERMISSION[args.mode], tools, resume)
+        res = call_claude(exe, model_id, args.effort, fb_prompt, cwd, args.timeout, PERMISSION[mode], tools, resume)
     finished = dt.datetime.now().isoformat(timespec="seconds")
     if out is not None:
         if res.ok:
@@ -485,6 +532,80 @@ def cmd_ask(args: argparse.Namespace) -> None:
     sys.stdout.write(res.text.rstrip() + "\n")
     sys.stdout.flush()
     log(f"完了（{label}）。session {res.session_id}  usage {json.dumps(res.usage, ensure_ascii=False)}")
+
+
+def cmd_ask(args: argparse.Namespace) -> None:
+    model_id, label = resolve_model(args.model)
+    task = _read_task(args)
+    cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
+    out = Path(args.out).resolve() if args.out else None
+    started = dt.datetime.now().isoformat(timespec="seconds")
+    meta = {"kind": "ask", "model": model_id, "label": label, "effort": args.effort, "mode": args.mode,
+            "cwd": str(cwd)}
+
+    if args.detach:
+        out = out or default_out()
+        task_path = Path(str(out) + ".task.md")
+        write_text(task_path, task)
+        child = ["--task-file", str(task_path), "--mode", args.mode, *_call_child_args(args, model_id, out, cwd)]
+        if args.allow:
+            child += ["--allow", args.allow]
+        _spawn_detached("ask", child, out, cwd, meta, started)
+        return
+
+    _execute(args, build_prompt(task, args.mode), args.mode, out, cwd, meta, started)
+
+
+def cmd_review(args: argparse.Namespace) -> None:
+    targets = args.target or []
+    if not targets and args.diff is None and not args.diff_file:
+        raise SystemExit("--target か --diff の少なくとも一方を指定してください。")
+    model_id, label = resolve_model(args.model)
+    task = _read_task(args, required=False)
+    cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
+    out = Path(args.out).resolve() if args.out else None
+    started = dt.datetime.now().isoformat(timespec="seconds")
+    missing = [t for t in targets if not (cwd / t).exists()]
+    if missing:
+        raise SystemExit(f"レビュー対象が見つかりません: {'、'.join(missing)}（--cwd からの相対パスか絶対パスで指定する）")
+    if args.detach and out is None:
+        out = default_out()
+
+    diff_text: str | None = None
+    diff_path: Path | None = None
+    diff_label = args.diff_label
+    if args.diff_file:
+        diff_path = Path(args.diff_file).resolve()
+        diff_text = read_text(diff_path)
+    elif args.diff is not None:
+        diff_label = f"git diff {args.diff}"
+        diff_text = capture_diff(args.diff, cwd)
+        if not diff_text.strip():
+            raise SystemExit(f"差分が空です（{diff_label}）。未追跡のファイルは含まれないので、--target で指定する。")
+        diff_path = Path(str(out or default_out()) + ".target.diff")
+        write_text(diff_path, diff_text)
+        log(f"取り込んだ差分を {diff_path} に書きました")
+
+    meta = {"kind": "review", "model": model_id, "label": label, "effort": args.effort, "mode": "analysis",
+            "cwd": str(cwd), "targets": targets, "diff": diff_label or None}
+
+    if args.detach:
+        child: list[str] = []
+        for t in targets:
+            child += ["--target", t]
+        if task:
+            task_path = Path(str(out) + ".task.md")
+            write_text(task_path, task)
+            child += ["--task-file", str(task_path)]
+        if diff_path is not None:
+            child += ["--diff-file", str(diff_path), "--diff-label", diff_label]
+        child += _call_child_args(args, model_id, out, cwd)
+        _spawn_detached("review", child, out, cwd, meta, started)
+        return
+
+    target = build_target(targets, diff_text, diff_label, diff_path)
+    prompt = build_prompt(task or NO_INTENT, "analysis", TEMPLATE_REVIEW, TARGET=target)
+    _execute(args, prompt, "analysis", out, cwd, meta, started)
 
 
 def cmd_wait(args: argparse.Namespace) -> None:
@@ -519,6 +640,18 @@ def cmd_status(args: argparse.Namespace) -> None:
     print(json.dumps(st, ensure_ascii=False, indent=2))
 
 
+def _add_call_args(p: argparse.ArgumentParser) -> None:
+    """ask と review に共通の引数。"""
+    p.add_argument("--model", default=DEFAULT_MODEL, help=f"{'、'.join(MODELS)} かモデル ID（既定 {DEFAULT_MODEL}）")
+    p.add_argument("--effort", choices=EFFORTS, default=DEFAULT_EFFORT, help=f"既定 {DEFAULT_EFFORT}")
+    p.add_argument("--out", help="最終メッセージを書くファイル")
+    p.add_argument("--detach", action="store_true", help="切り離して起動し、wait で受け取る")
+    p.add_argument("--resume", help="続きを聞くセッション ID（同じ作業ディレクトリから呼ぶ）")
+    p.add_argument("--cwd", help="Claude の作業ディレクトリ（既定は現在のディレクトリ）")
+    p.add_argument("--timeout", type=int, default=1800, help="呼び出しの上限秒数（既定 1800）")
+    p.add_argument("--no-fallback", action="store_true", help="Fable 5.1 が利用制限で使えなくても Opus 5.5 に切り替えない")
+
+
 def main(argv: list[str] | None = None) -> None:
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -534,17 +667,21 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("ask", help="Claude に依頼し、最終メッセージを受け取る")
     p.add_argument("--task", help="依頼の本文")
     p.add_argument("--task-file", help="依頼の本文を書いたファイル")
-    p.add_argument("--model", default=DEFAULT_MODEL, help=f"{'、'.join(MODELS)} かモデル ID（既定 {DEFAULT_MODEL}）")
-    p.add_argument("--effort", choices=EFFORTS, default=DEFAULT_EFFORT, help=f"既定 {DEFAULT_EFFORT}")
     p.add_argument("--mode", choices=list(PERMISSION), default="analysis", help="analysis は読み取り専用、edit は作業ツリーを編集できる")
     p.add_argument("--allow", help="edit モードで追加で許す道具（例: \"Bash(make:*),Bash(python:*)\"）")
-    p.add_argument("--out", help="最終メッセージを書くファイル")
-    p.add_argument("--detach", action="store_true", help="切り離して起動し、wait で受け取る")
-    p.add_argument("--resume", help="続きを聞くセッション ID（同じ作業ディレクトリから呼ぶ）")
-    p.add_argument("--cwd", help="Claude の作業ディレクトリ（既定は現在のディレクトリ）")
-    p.add_argument("--timeout", type=int, default=1800, help="呼び出しの上限秒数（既定 1800）")
-    p.add_argument("--no-fallback", action="store_true", help="Fable 5.1 が利用制限で使えなくても Opus 5.5 に切り替えない")
+    _add_call_args(p)
     p.set_defaults(func=cmd_ask)
+
+    p = sub.add_parser("review", help="対象を壊す敵対的レビューを依頼し、最終メッセージを受け取る（常に読み取り専用）")
+    p.add_argument("--target", action="append", help="レビュー対象のファイルまたはディレクトリ。繰り返し指定できる")
+    p.add_argument("--diff", nargs="?", const="HEAD", metavar="REV",
+                   help="git diff REV を取り込んでレビューする（REV を省くと HEAD。未追跡のファイルは含まない）")
+    p.add_argument("--task", help="対象が果たすべき目的（任意）")
+    p.add_argument("--task-file", help="対象が果たすべき目的を書いたファイル（任意）")
+    _add_call_args(p)
+    p.add_argument("--diff-file", help=argparse.SUPPRESS)  # 切り離した子が、親の取り込んだ差分を読む
+    p.add_argument("--diff-label", default="", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_review)
 
     p = sub.add_parser("wait", help="切り離した依頼の完了を待ち、最終メッセージを出す")
     p.add_argument("out")

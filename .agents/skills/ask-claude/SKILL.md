@@ -1,6 +1,6 @@
 ---
 name: ask-claude
-description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。長い依頼は切り離して起動し、後で受け取る。
+description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。指定したファイルや差分の欠陥と反例を探す敵対的レビューも頼める。長い依頼は切り離して起動し、後で受け取る。
 ---
 
 # Claude への依頼
@@ -8,6 +8,7 @@ description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude
 Claude Code CLI（`claude -p`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
 モデルは Claude Opus 5.5（既定）と Claude Fable 5.1、effort は medium、high、xhigh から選ぶ。
 Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
+対象を壊すことを役割とする敵対的レビューは `review` で頼む（下の「敵対的レビュー」）。
 
 ## 手順
 
@@ -19,7 +20,7 @@ Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 に切り替�
 python .agents/skills/ask-claude/scripts/ask_claude.py check
 ```
 
-実行ファイル、バージョン、ログイン状態、API ホストへの到達を表で出す。使えなければ終了コード 1 で止まるので、作者に `claude auth login` を実行してもらうか、下の「注意」のネットワークの項を確かめる。`ask` も呼び出しの前に同じ確認をする。
+実行ファイル、バージョン、ログイン状態、API ホストへの到達を表で出す。使えなければ終了コード 1 で止まるので、作者に `claude auth login` を実行してもらうか、下の「注意」のネットワークの項を確かめる。`ask` と `review` も呼び出しの前に同じ確認をする。
 
 ### 2. 依頼を書く
 
@@ -54,12 +55,33 @@ python .agents/skills/ask-claude/scripts/ask_claude.py wait <file>
 返ってきた内容は根拠を確かめてから使う。`edit` モードでは `git diff` で変更を確かめる。
 続けて聞くには、標準エラーに出た session ID を `--resume <id>` に渡す。同じ作業ディレクトリから呼ぶこと。
 
+## 敵対的レビュー
+
+`review` は、指定した対象を壊すことを役割とするレビューを頼む。レビュアーは対象を褒めず、改善案も出さない。欠陥、反例、崩れる前提を、重大度と根拠を添えて並べる。
+欠陥が見つからなければ「崩せなかった」と書くよう指示してあるので、指摘の数で対象の良し悪しを測らない。
+
+```powershell
+python .agents/skills/ask-claude/scripts/ask_claude.py review --target src/parser.py --target docs/design.md --task-file <path>
+python .agents/skills/ask-claude/scripts/ask_claude.py review --diff --detach --out <file>
+python .agents/skills/ask-claude/scripts/ask_claude.py review --diff main..HEAD --model fable --effort xhigh
+```
+
+- `--target <path>` はレビュー対象のファイルかディレクトリで、繰り返し指定できる。プロンプトにはパスだけを書き、レビュアーが自分で読む。パスは `--cwd` からの相対パスか絶対パスで書く。見つからなければ呼び出す前に止まる。
+- `--diff [REV]` は `git diff REV`（REV を省くと `git diff HEAD`。ステージ済みと未ステージの変更）を取り込み、プロンプトに埋め込む。未追跡のファイルは含まないので、新しいファイルは `--target` で指定する。取り込んだ差分は `<out>.target.diff` に残す（`--out` が無ければ `%TEMP%\ask-claude\` の下。置き場所は標準エラーに出す）。200 KB を超える差分は埋め込まず、そのファイルを読ませる。
+- `--target` と `--diff` は一緒に使える。どちらも無ければ止まる。
+- `--task` / `--task-file` で、対象が果たすべき目的を渡す（任意）。省くと、レビュアーは目的を仮定し、仮定であることを書く。
+- 常に読み取り専用の依頼として走る。`--mode` と `--allow` は無く、事前承認するのは `analysis` と同じ読み取り系の道具だけである。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout`、`--no-fallback` は `ask` と同じで、Fable 5.1 が利用制限で止まったときの Opus 5.5 への切り替えも同じに働く。切り離したら `wait` で受け取る。
+
+最終メッセージは `## 判定`（採用可、条件付きで採用可、却下と確信度）、`## 致命的・重大な欠陥`、`## 崩れる前提`、`## 見落としと軽微な問題`、`## 検証した事実`、`## 崩せなかった点` の順に並ぶ。
+指摘は根拠を確かめてから採る。「推測」と書かれた指摘は、確かめるまで採らない。
+
 ## 注意
 
-- Codex の workspace-write サンドボックスは既定でネットワークを遮断するので、`claude` の API 呼び出しが接続拒否で失敗する（実測では約 3 分待ってから落ちた）。`check` と `ask` は先に API ホストへの到達を確かめて止まる。対処は、`~/.codex/config.toml` の `[sandbox_workspace_write]` に `network_access = true` を設定する（`-c sandbox_workspace_write.network_access=true` でも可。この設定で成功を確認した）か、Codex が求める承認でサンドボックス外の実行を許可する。
-- 費用は呼び出しごとにかかる。同じ依頼を作者の指示なしに繰り返さない。Opus 5.5 への切り替えは、利用制限で止まったときにだけ自動で 1 回行う。
+- Codex の workspace-write サンドボックスは既定でネットワークを遮断するので、`claude` の API 呼び出しが接続拒否で失敗する（実測では約 3 分待ってから落ちた）。`check`、`ask`、`review` は先に API ホストへの到達を確かめて止まる。対処は、`~/.codex/config.toml` の `[sandbox_workspace_write]` に `network_access = true` を設定する（`-c sandbox_workspace_write.network_access=true` でも可。この設定で成功を確認した）か、Codex が求める承認でサンドボックス外の実行を許可する。
+- 費用は呼び出しごとにかかる。同じ依頼を作者の指示なしに繰り返さない。`review` も `ask` と同じに費用がかかる。Opus 5.5 への切り替えは、利用制限で止まったときにだけ自動で 1 回行う。
 - `--timeout` の既定は 1800 秒で、呼び出し 1 回ごとの上限である。超えると失敗として記録する。切り替えると合計で最長 2 倍かかる。
 - `claude` の `--fallback-model` は過負荷やモデルが使えないときの切り替えで、利用制限（429）では切り替わらない（Claude Code 2.1.289 で確認）。そのためこのスキルは自前で切り替える。
 - `claude` が PATH に無ければ `~/.local/bin/claude.exe` を使う。環境変数 `ASK_CLAUDE_EXE` で実行ファイルを指定できる。
-- Claude はリポジトリの `CLAUDE.md` を自動で読むが、このスキルのプロンプト（`templates/task.md`）はそれに依存しない。
-- 取り込み規則のテスト: `python -m unittest discover -s .agents/skills/ask-claude/scripts -p "test_*.py"`
+- Claude はリポジトリの `CLAUDE.md` を自動で読むが、このスキルのプロンプト（`templates/task.md` と `templates/adversarial.md`）はそれに依存しない。
+- `templates/adversarial.md` は ask-codex と同じ文面に保つ。片方を直したら、もう片方も直す。
+- 取り込み規則、テンプレート、`review` のテスト: `python -m unittest discover -s .agents/skills/ask-claude/scripts -p "test_*.py"`
