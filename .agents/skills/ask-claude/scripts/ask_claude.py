@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""ask-claude: Codex から Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼する。
+"""ask-claude: Codex から Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.2 に 1 つのタスクを依頼する。
 
 Claude の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
 review は、指定したファイルや差分を壊すことを役割とする敵対的レビューを、読み取り専用で頼む。
-既定は Opus 5.5。Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
+既定は Opus 5.5。Fable 5.2 を選んで利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
 
 使い方:
   python ask_claude.py check
@@ -42,7 +42,7 @@ TEMPLATE_REVIEW = SKILL_DIR / "templates" / "adversarial.md"
 DIFF_INLINE_LIMIT = 200_000  # 差分をプロンプトへ埋め込む上限（バイト）。超えたらファイルを読ませる。
 NO_INTENT = "（指定なし。対象から読み取れる目的を仮定し、仮定であることを書く）"
 
-MODELS = {"fable": ("claude-fable-5-1", "Claude Fable 5.1"), "opus": ("claude-opus-5-5", "Claude Opus 5.5")}
+MODELS = {"fable": ("claude-fable-5-2", "Claude Fable 5.2"), "opus": ("claude-opus-5-5", "Claude Opus 5.5")}
 DEFAULT_MODEL = "opus"
 # 利用制限で使えないときに切り替える先。キーはモデル ID、値は MODELS のキー。
 FALLBACK = {MODELS["fable"][0]: "opus"}
@@ -491,7 +491,7 @@ def _execute(args: argparse.Namespace, prompt: str, mode: str, out: Path | None,
              meta: dict, started: str) -> None:
     """Claude を呼び、最終メッセージを標準出力（と out）に書く。ask と review が共有する。
 
-    Fable 5.1 が利用制限で止まったら、Opus 5.5 に切り替える。
+    Fable 5.2 が利用制限で止まったら、Opus 5.5 に切り替える。
     """
     exe = preflight()
     model_id, label = meta["model"], meta["label"]
@@ -651,7 +651,7 @@ def _add_call_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--resume", help="続きを聞くセッション ID（同じ作業ディレクトリから呼ぶ）")
     p.add_argument("--cwd", help="Claude の作業ディレクトリ（既定は現在のディレクトリ）")
     p.add_argument("--timeout", type=int, default=1800, help="呼び出しの上限秒数（既定 1800）")
-    p.add_argument("--no-fallback", action="store_true", help="Fable 5.1 が利用制限で使えなくても Opus 5.5 に切り替えない")
+    p.add_argument("--no-fallback", action="store_true", help="Fable 5.2 が利用制限で使えなくても Opus 5.5 に切り替えない")
 
 
 def main(argv: list[str] | None = None) -> None:
