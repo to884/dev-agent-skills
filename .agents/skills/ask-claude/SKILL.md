@@ -1,13 +1,13 @@
 ---
 name: ask-claude
-description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.1 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。指定したファイルや差分の欠陥と反例を探す敵対的レビューも頼める。長い依頼は切り離して起動し、後で受け取る。
+description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude Fable 5.2 に 1 つのタスクを依頼し、最終メッセージを受け取る。別モデルの見解、レビュー、原因究明、実装の委任に使う。指定したファイルや差分の欠陥と反例を探す敵対的レビューも頼める。長い依頼は切り離して起動し、後で受け取る。
 ---
 
 # Claude への依頼
 
 Claude Code CLI（`claude -p`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
-モデルは Claude Opus 5.5（既定）と Claude Fable 5.1、effort は medium、high、xhigh から選ぶ。
-Fable 5.1 を選んで利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
+モデルは Claude Opus 5.5（既定）と Claude Fable 5.2、effort は medium、high、xhigh から選ぶ。
+Fable 5.2 を選んで利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
 対象を壊すことを役割とする敵対的レビューは `review` で頼む（下の「敵対的レビュー」）。
 
 ## 手順
@@ -35,8 +35,8 @@ python .agents/skills/ask-claude/scripts/ask_claude.py check
 python .agents/skills/ask-claude/scripts/ask_claude.py ask --task-file <path> --effort high
 ```
 
-- 既定は Claude Opus 5.5。`--model fable` で Claude Fable 5.1。`--effort medium|high|xhigh`（既定 high）。
-- Fable 5.1 が利用制限（429）で止まったら、同じ effort と mode で Opus 5.5 に切り替える。Fable がツールを呼ぶ前に止まったなら同じ依頼を最初から渡し、ツールを呼んだ後なら Fable のセッションを `--resume` で引き継いで続けさせる。切り替えたことは標準エラーに出し、`.status.json` の `fallback` に元のモデルとエラーを残す（`model` と `label` は切り替え後のものになる）。切り替えたくなければ `--no-fallback` を付ける。
+- 既定は Claude Opus 5.5。`--model fable` で Claude Fable 5.2。`--effort medium|high|xhigh`（既定 high）。
+- Fable 5.2 が利用制限（429）で止まったら、同じ effort と mode で Opus 5.5 に切り替える。Fable がツールを呼ぶ前に止まったなら同じ依頼を最初から渡し、ツールを呼んだ後なら Fable のセッションを `--resume` で引き継いで続けさせる。切り替えたことは標準エラーに出し、`.status.json` の `fallback` に元のモデルとエラーを残す（`model` と `label` は切り替え後のものになる）。切り替えたくなければ `--no-fallback` を付ける。
 - `claude` は常に `--permission-mode auto`（Auto）で起動する。`--mode analysis`（既定）と `--mode edit` の違いは、事前承認する道具の範囲とプロンプトの指示だけで、権限モードは同じ。`analysis` は読み取りだけを依頼する（書き換えの禁止はプロンプトの指示であり、権限では強制しない）。`edit` は作業ツリーの編集を依頼する。ビルドやテストのコマンドも事前承認するなら `--allow "Bash(make:*),Bash(python:*)"` のように足す。
 - `--out <file>` で最終メッセージをファイルにも書く。
 
@@ -70,7 +70,7 @@ python .agents/skills/ask-claude/scripts/ask_claude.py review --diff main..HEAD 
 - `--diff [REV]` は `git diff REV`（REV を省くと `git diff HEAD`。ステージ済みと未ステージの変更）を取り込み、プロンプトに埋め込む。未追跡のファイルは含まないので、新しいファイルは `--target` で指定する。取り込んだ差分は `<out>.target.diff` に残す（`--out` が無ければ `%TEMP%\ask-claude\` の下。置き場所は標準エラーに出す）。200 KB を超える差分は埋め込まず、そのファイルを読ませる。
 - `--target` と `--diff` は一緒に使える。どちらも無ければ止まる。
 - `--task` / `--task-file` で、対象が果たすべき目的を渡す（任意）。省くと、レビュアーは目的を仮定し、仮定であることを書く。
-- 常に読み取り専用の依頼として走る。`--mode` と `--allow` は無く、事前承認するのは `analysis` と同じ読み取り系の道具だけである。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout`、`--no-fallback` は `ask` と同じで、Fable 5.1 が利用制限で止まったときの Opus 5.5 への切り替えも同じに働く。切り離したら `wait` で受け取る。
+- 常に読み取り専用の依頼として走る。`--mode` と `--allow` は無く、事前承認するのは `analysis` と同じ読み取り系の道具だけである。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout`、`--no-fallback` は `ask` と同じで、Fable 5.2 が利用制限で止まったときの Opus 5.5 への切り替えも同じに働く。切り離したら `wait` で受け取る。
 
 最終メッセージは `## 判定`（採用可、条件付きで採用可、却下と確信度）、`## 致命的・重大な欠陥`、`## 崩れる前提`、`## 見落としと軽微な問題`、`## 検証した事実`、`## 崩せなかった点` の順に並ぶ。
 指摘は根拠を確かめてから採る。「推測」と書かれた指摘は、確かめるまで採らない。

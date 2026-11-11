@@ -6,11 +6,12 @@
 
 | 項目 | 典拠 | 確認日 |
 | --- | --- | --- |
-| 各モデルの単価と特性 | `claude-api` スキルのモデル表（同スキル内のキャッシュ日は 2026-10-06） | 2026-10-31 |
-| キャッシュ読み出しが Fable 5.1 $0.25、Opus 5.5 $0.20 | 同梱の `claude-api` スキル | 2026-10-31 |
+| 各モデルの単価と特性 | `claude-api` スキルのモデル表（同スキル内のキャッシュ日は 2026-11-03） | 2026-11-11 |
+| キャッシュ読み出しが Fable 5.2 $0.20、Opus 5.5 $0.20 | 同梱の `claude-api` スキル | 2026-11-11 |
 | effort の段ごとの計測値と、使える段がモデルで違うこと | `claude-api` スキルの `shared/cost-optimization.md`（Anthropic の計測） | 2026-09-29 |
-| モデルメニューの表示 | `/model` のメニュー（Fable の値 `claude-fable-5-1[1m]` は `~/.claude.json` の `additionalModelOptionsCache`） | 2026-10-31 |
-| `model: "fable"` が Fable 5.1 に届く | 実測。子が自分のモデル ID を `claude-fable-5-1` と回答 | 2026-09-28 |
+| モデルメニューの Opus、Sonnet、Haiku の表示 | `/model` のメニュー | 2026-10-31 |
+| モデルメニューの Fable の表示と値 | 未確認。2026-11-11 時点の `~/.claude.json` の `additionalModelOptionsCache` は、表示「Fable」、値 `claude-fable-5-1[1m]`、説明「Fable 5.1」のまま。メニューを開いて読み直す | — |
+| `model: "fable"` が Fable 5.2 に届く | 実測。子が自分のモデル ID を `claude-fable-5-2` と回答 | 2026-11-11 |
 | `model` の `"opus"`、`"sonnet"`、`"haiku"` の解決先 | 未実測（B-484） | — |
 | effort 変更時にこのクライアントがキャッシュを保つか | 未実測（B-484） | — |
 

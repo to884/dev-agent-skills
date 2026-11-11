@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """multi-agent-dispatch のオーケストレーター。
 
-同じタスクを最大 4 体のエージェント（Claude Opus 5.5、Claude Fable 5.1、GPT-6.1 Sol、GPT-6 Astra）に
+同じタスクを最大 4 体のエージェント（Claude Opus 5.5、Claude Fable 5.2、GPT-6.1 Sol、GPT-6 Astra）に
 `claude -p` と `codex exec` で独立に解かせ、成果を集める。任意で敵対的な相互レビューと総括を続ける。
 
 各 CLI の最終メッセージは標準出力の JSON ストリームから組み立て、全エージェントが終わってから
@@ -38,14 +38,14 @@ TEMPLATE_DIR = SKILL_DIR / "templates"
 # エージェントの既定。run.json へ写してから使うので、実行ごとに書き換えられる。
 DEFAULT_AGENTS = {
     "A": {"vendor": "claude", "model": "claude-opus-5-5", "label": "Claude Opus 5.5"},
-    "B": {"vendor": "claude", "model": "claude-fable-5-1", "label": "Claude Fable 5.1"},
+    "B": {"vendor": "claude", "model": "claude-fable-5-2", "label": "Claude Fable 5.2"},
     "C": {"vendor": "codex", "model": "gpt-6.1-sol", "label": "GPT-6.1 Sol"},
     "D": {"vendor": "codex", "model": "gpt-6-astra", "label": "GPT-6 Astra"},
 }
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"
 SYNTHESIS_EFFORT = "medium"
-DEFAULT_SYNTH = {"vendor": "claude", "model": "claude-fable-5-1", "label": "Claude Fable 5.1"}
+DEFAULT_SYNTH = {"vendor": "claude", "model": "claude-fable-5-2", "label": "Claude Fable 5.2"}
 DEFAULT_OUT_DIR = "docs/agent-runs"
 WORKTREE_DIR = ".agents/worktrees"
 
@@ -749,7 +749,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--effort", choices=EFFORTS, default=DEFAULT_EFFORT, help="実行とレビューの effort（既定 high）")
     p.add_argument("--mode", choices=["analysis", "implement"], default="analysis")
     p.add_argument("--allow", help="implement モードで Claude に追加で許す道具（例: \"Bash(make:*),Bash(python:*)\"）")
-    p.add_argument("--synth-model", help="総括のモデル（既定 claude-fable-5-1）")
+    p.add_argument("--synth-model", help="総括のモデル（既定 claude-fable-5-2）")
     p.add_argument("--out-dir", default=DEFAULT_OUT_DIR, help=f"実行ディレクトリの親（既定 {DEFAULT_OUT_DIR}）")
     p.add_argument("--timeout", type=int, default=3600, help="1 呼び出しの上限秒数")
     p.set_defaults(func=cmd_init)

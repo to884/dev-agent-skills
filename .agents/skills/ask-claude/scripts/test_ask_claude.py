@@ -107,7 +107,7 @@ class FallbackTests(unittest.TestCase):
         ok = "\n".join([_assistant(_text("本文")), _result("本文")])
         calls, code = self._ask([self._limited(), ok], "--model", "fable")
         self.assertEqual(code, 0)
-        self.assertEqual([c[0] for c in calls], ["claude-fable-5-1", "claude-opus-5-5"])
+        self.assertEqual([c[0] for c in calls], ["claude-fable-5-2", "claude-opus-5-5"])
         self.assertEqual(calls[0][1], calls[1][1])
         self.assertIsNone(calls[1][2])
 
@@ -136,7 +136,7 @@ class FallbackTests(unittest.TestCase):
             st = ask.read_status(out)
         self.assertEqual(st["state"], "done")
         self.assertEqual(st["model"], "claude-opus-5-5")
-        self.assertEqual(st["fallback"]["from"], "claude-fable-5-1")
+        self.assertEqual(st["fallback"]["from"], "claude-fable-5-2")
 
 
 class AuthAndModelTests(unittest.TestCase):
@@ -146,7 +146,7 @@ class AuthAndModelTests(unittest.TestCase):
         self.assertFalse(ask.parse_claude_auth("not json")[0])
 
     def test_model_aliases_and_ids(self):
-        self.assertEqual(ask.resolve_model("fable"), ("claude-fable-5-1", "Claude Fable 5.1"))
+        self.assertEqual(ask.resolve_model("fable"), ("claude-fable-5-2", "Claude Fable 5.2"))
         self.assertEqual(ask.resolve_model("OPUS"), ("claude-opus-5-5", "Claude Opus 5.5"))
         self.assertEqual(ask.resolve_model("claude-sonnet-5")[0], "claude-sonnet-5")
         with self.assertRaises(SystemExit):
@@ -281,10 +281,10 @@ class ReviewCommandTests(unittest.TestCase):
                                    outputs=(_LIMITED, _OK))
         self.assertEqual(code, 0)
         models = [c[0][c[0].index("--model") + 1] for c in calls]
-        self.assertEqual(models, ["claude-fable-5-1", "claude-opus-5-5"])
+        self.assertEqual(models, ["claude-fable-5-2", "claude-opus-5-5"])
         self.assertEqual(calls[0][1], calls[1][1])
         st = ask.read_status(out)
-        self.assertEqual((st["kind"], st["model"], st["fallback"]["from"]), ("review", "claude-opus-5-5", "claude-fable-5-1"))
+        self.assertEqual((st["kind"], st["model"], st["fallback"]["from"]), ("review", "claude-opus-5-5", "claude-fable-5-2"))
     def test_detached_child_reviews_the_captured_diff(self):
         out = self.dir / "review.md"
         spawned = []
