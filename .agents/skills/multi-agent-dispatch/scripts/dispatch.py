@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """multi-agent-dispatch のオーケストレーター。
 
-同じタスクを最大 4 体のエージェント（Claude Opus 5.5、Claude Fable 5.2、GPT-6.1 Sol、GPT-6 Astra）に
+同じタスクを最大 4 体のエージェント（Claude Opus 5.5、Claude Fable 5.2、GPT-6.2 Sol、GPT-6.2 Astra）に
 `claude -p` と `codex exec` で独立に解かせ、成果を集める。任意で敵対的な相互レビューと総括を続ける。
 
 各 CLI の最終メッセージは標準出力の JSON ストリームから組み立て、全エージェントが終わってから
@@ -39,8 +39,8 @@ TEMPLATE_DIR = SKILL_DIR / "templates"
 DEFAULT_AGENTS = {
     "A": {"vendor": "claude", "model": "claude-opus-5-5", "label": "Claude Opus 5.5"},
     "B": {"vendor": "claude", "model": "claude-fable-5-2", "label": "Claude Fable 5.2"},
-    "C": {"vendor": "codex", "model": "gpt-6.1-sol", "label": "GPT-6.1 Sol"},
-    "D": {"vendor": "codex", "model": "gpt-6-astra", "label": "GPT-6 Astra"},
+    "C": {"vendor": "codex", "model": "gpt-6.2-sol", "label": "GPT-6.2 Sol"},
+    "D": {"vendor": "codex", "model": "gpt-6.2-astra", "label": "GPT-6.2 Astra"},
 }
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"

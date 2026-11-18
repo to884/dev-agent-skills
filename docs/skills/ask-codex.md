@@ -18,7 +18,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task "既存テスト
 
 ## モデルと編集範囲
 
-スクリプトの既定は GPT-6 Astra です。`--model sol` で GPT-6.1 Sol を指定できます。
+スクリプトの既定は GPT-6.2 Astra です。`--model sol` で GPT-6.2 Sol を指定できます。
 既定の `analysis` では読み取り専用で実行します。作業ツリーの編集を許可する場合は `ask --mode edit` を使います。
 モデルと effort の選び方は別ページにまとめています。[openai-model-routing](openai-model-routing.md)
 

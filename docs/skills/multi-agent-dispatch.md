@@ -13,7 +13,7 @@ python .agents/skills/multi-agent-dispatch/scripts/dispatch.py check
 python .agents/skills/multi-agent-dispatch/scripts/dispatch.py init --slug design-review --task-file task.md --agents A,C
 ```
 
-1. `init` に依頼を書いた Markdown ファイルとエージェントを渡します。例の `A,C` は Claude Opus 5.5 と GPT-6.1 Sol を指定します。
+1. `init` に依頼を書いた Markdown ファイルとエージェントを渡します。例の `A,C` は Claude Opus 5.5 と GPT-6.2 Sol を指定します。
 2. `run` に `init` が表示した実行ディレクトリを渡します。各エージェントの結果は、その中の `results/` にまとまります。
 3. 必要に応じて、同じディレクトリを `review` と `synthesize` に渡します。`review` は互いの成果から欠陥や反例を探します。`synthesize` は各指摘の反証を試み、問題を確認できた指摘を修正対象として `summary.md` に記録します。覆せた指摘は棄却し、資料が足りない指摘は保留します。
 

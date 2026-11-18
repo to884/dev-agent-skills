@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ask-codex: Claude Code から Codex CLI の GPT-6 Astra または GPT-6.1 Sol に 1 つのタスクを依頼する。
+"""ask-codex: Claude Code から Codex CLI の GPT-6.2 Astra または GPT-6.2 Sol に 1 つのタスクを依頼する。
 
 Codex の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
@@ -41,7 +41,7 @@ TEMPLATE_REVIEW = SKILL_DIR / "templates" / "adversarial.md"
 DIFF_INLINE_LIMIT = 200_000  # 差分をプロンプトへ埋め込む上限（バイト）。超えたらファイルを読ませる。
 NO_INTENT = "（指定なし。対象から読み取れる目的を仮定し、仮定であることを書く）"
 
-MODELS = {"astra": ("gpt-6-astra", "GPT-6 Astra"), "sol": ("gpt-6.1-sol", "GPT-6.1 Sol")}
+MODELS = {"astra": ("gpt-6.2-astra", "GPT-6.2 Astra"), "sol": ("gpt-6.2-sol", "GPT-6.2 Sol")}
 DEFAULT_MODEL = "astra"
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"

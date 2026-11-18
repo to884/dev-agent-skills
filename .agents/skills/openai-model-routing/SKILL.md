@@ -1,11 +1,11 @@
 ---
 name: openai-model-routing
-description: Codex CLI に渡す OpenAI のモデルを GPT-6 Astra、GPT-6.1 Sol、GPT-6 Luna から選ぶときと、reasoning effort の段を決めるときに使う。各モデルを選ぶ条件と単価、ChatGPT ログインの共有 allowance と API 従量の違い、ask-codex と multi-agent-dispatch での指定方法、モデルを変えたときのキャッシュの扱いを提供する。Codex へ委譲する前、複数モデルで比較する前、effort の段を決めるときに参照する。
+description: Codex CLI に渡す OpenAI のモデルを GPT-6.2 Astra、GPT-6.2 Sol、GPT-6 Luna から選ぶときと、reasoning effort の段を決めるときに使う。各モデルを選ぶ条件と単価、ChatGPT ログインの共有 allowance と API 従量の違い、ask-codex と multi-agent-dispatch での指定方法、モデルを変えたときのキャッシュの扱いを提供する。Codex へ委譲する前、複数モデルで比較する前、effort の段を決めるときに参照する。
 ---
 
 # OpenAI モデルの選び分け
 
-このスキルでの既定は GPT-6 Astra の `medium`。作者の `~/.codex/config.toml` と OpenAI の指針に合わせた値。委譲スクリプトの既定は `high` なので、選んだ effort を明示する（「effort の決め方」）。
+このスキルでの既定は GPT-6.2 Astra の `medium`。委譲スクリプトの既定は `high` なので、選んだ effort を明示する（「effort の決め方」）。
 このスキルは、既定から外す理由があるかの判定と、外すときの指定方法を持つ。
 Claude 側のモデル選択は `claude-model-routing`。判定の軸は同じで、候補と経路と課金の形が違う。
 
@@ -32,10 +32,10 @@ Claude Code のセッションは GPT にならない。GPT を使うのは Code
 
 | 認証 | 課金 | この環境 |
 | --- | --- | --- |
-| ChatGPT ログイン | プランに含まれる Work と Codex の共有 allowance。5 時間窓と週窓の両方に残りが要る | こちら。`codex login status` が `Logged in using ChatGPT` |
+| ChatGPT ログイン | プランに含まれる Work と Codex の共有 allowance。5 時間窓と週窓はプランに応じて適用される | こちら。`codex login status` が `Logged in using ChatGPT` |
 | API キー | トークン単価の従量 | 使っていない |
 
-allowance の消費はタスク、モデル、effort で変わる。OpenAI Help の推定メッセージ数は GPT-6 Astra と GPT-5.6 系の分だけで、GPT-6 Luna と GPT-6.1 Sol の推定値、同じタスクでの allowance 消費比は未確認（`references/notes.md`）。
+allowance の消費はタスク、モデル、effort で変わる。Plus と Standard Business の 5 時間あたりの推定メッセージ数は `references/notes.md` を参照する。
 モデルを切り替えても allowance は戻らない。作者のプランと残量は未確認なので、長い委譲や dispatch の `all` の前に Settings → Usage を見てもらう。
 
 単価表は API の値。ChatGPT ログインでは費用の桁の見当にだけ使い、作者への費用の説明は allowance の消費で言う。
@@ -61,34 +61,27 @@ API 従量では、リクエスト全体の入力が 272K トークンを超え�
 | 順 | モデル | ID | `ask-codex --model` | `dispatch` 記号 | $/1M 入力・出力 | 条件 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | GPT-6 Luna | `gpt-6-luna` | `gpt-6-luna` | 無し | 0.1・0.5 | 判断が薄く量だけが多い。受入条件が確定し、成果を機械的に検査できる |
-| 2 | GPT-6.1 Sol | `gpt-6.1-sol` | `sol` | C | 2・10 | 手順が決まっていて既存のパターンを踏襲する。受入条件が確定し、成果を機械的に検査できる |
-| 3 | GPT-6 Astra | `gpt-6-astra` | `astra`（既定） | D | 10・50 | 既定。上のどれにも当てはまらない |
+| 2 | GPT-6.2 Sol | `gpt-6.2-sol` | `sol` | C | 2・10 | 手順が決まっていて既存のパターンを踏襲する。受入条件が確定し、成果を機械的に検査できる |
+| 3 | GPT-6.2 Astra | `gpt-6.2-astra` | `astra`（既定） | D | 8・40 | 既定。上のどれにも当てはまらない |
 
-GPT-6.1 Sol の文脈窓は 1,050,000、最大入力は 922,000、最大出力は 128,000。effort は `low`、`medium`（既定）、`high`、`xhigh`、`max` をサポートし、`none` と `minimal` は非対応。Astra の上の段は無く、上げる手は effort。
-GPT-6 Sol（旧モデル）の仕様や価格は GPT-6.1 Sol に当てはめず、各モデルの公式情報を基準にする。
-
-Astra について OpenAI が書いていること。
-
-- `none` を受け付けない（400）。最低は `low`
-- 完了と見なす前にテストを徹底する傾向がある。小さな変更では、期待するテストの範囲を prompt に書く
-- 出力トークンが少なく、タスクあたりの費用は前世代より安いことがある。単価だけで判断しない
+API では GPT-6.2 Astra と GPT-6.2 Sol の文脈窓は 1,050,000、最大入力は 922,000、最大出力は 128,000。両モデルの API の effort は `low` から `max` まで。
 
 ## effort の決め方
 
-effort はモデルより先に動かす。OpenAI の旧 GPT-6 Sol 向け指針では「Astra の `low` が Sol の `high` を上回ることがある。Sol の `high` で満足なら Astra の `low` か `medium` から」とされていた。GPT-6.1 Sol に同じ比較を適用できるかは未確認。
+effort はモデルより先に動かす。モデルの世代を切り替えたときは、使い慣れたタスクで結果を確かめてから effort を調整する。
 
-| 段 | OpenAI の用途 | Astra |
+| 段 | OpenAI の用途 | GPT-6.2 Astra / Sol |
 | --- | --- | --- |
 | `none` | 推論が要らない遅延重視。分類、短い取得 | 不可 |
 | `low` | 道具呼びと多段の判断を速く安く | 可 |
-| `medium` | 既定。計画と複雑な推論の釣り合い | 既定 |
+| `medium` | 計画と複雑な推論の釣り合い | このスキルの既定 |
 | `high` | 難しい推論、複雑なデバッグ、深い計画 | 可 |
 | `xhigh` | 深い調査、長く走る agentic な作業 | 可 |
 | `max` | 最難の作業 | 可 |
-| `ultra` | サブエージェントへ委任する形。Astra と GPT-6 Sol（旧モデル） | `codex exec` で通るかは未確認。GPT-6.1 Sol は非対応 |
+| `ultra` | サブエージェントへ並行して委任する | ローカルの Codex のモデル一覧に掲載。`codex exec` での動作は未確認 |
 
 Codex CLI では `-c model_reasoning_effort="<段>"`。`ask-codex` と `dispatch` の `--effort` は `medium|high|xhigh` に絞ってあり、既定は `high`。`low` や `max` を使うにはスクリプトの `EFFORTS` を広げるか、`codex exec` を直接呼ぶ。
-両スクリプトは Codex に effort を明示して渡すため、省略すると `config.toml` の `medium` よりスクリプトの既定 `high` が優先される。このスキル経由の `ask-codex` では、別の段を選ぶ理由や作者の指定がなければ `--effort medium` を必ず明示する。`dispatch` では、実行前に対象の Codex エージェントの `effort` に `{"run":"medium","review":"medium"}` を明示する。全員に同じ段を適用する場合は `init --effort medium` でもよい。スクリプト自体の既定値は変更しない。
+両スクリプトは Codex に effort を明示して渡すため、省略すると `config.toml` の設定よりスクリプトの既定 `high` が優先される。このスキル経由の `ask-codex` では、別の段を選ぶ理由や作者の指定がなければ `--effort medium` を必ず明示する。`dispatch` では、実行前に対象の Codex エージェントの `effort` に `{"run":"medium","review":"medium"}` を明示する。全員に同じ段を適用する場合は `init --effort medium` でもよい。スクリプト自体の既定値は変更しない。
 
 段ごとの計測値は無い。Anthropic の曲線（`claude-model-routing`）を GPT に当てはめない。OpenAI が書いているのは次の 3 つだけ。
 
@@ -104,10 +97,10 @@ Codex CLI では `-c model_reasoning_effort="<段>"`。`ask-codex` と `dispatch
 python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --model astra --effort medium
 ```
 
-`--model` は `astra`、`sol`（GPT-6.1 Sol）、またはモデル ID そのもの（`gpt-6.1-sol`、`gpt-6-luna`）。
+`--model` は `astra`（GPT-6.2 Astra）、`sol`（GPT-6.2 Sol）、またはモデル ID そのもの（`gpt-6.2-astra`、`gpt-6.2-sol`、`gpt-6-luna`）。
 委譲の条件と prompt に書くものは `claude-model-routing` の経路 1 と同じ。Codex 向けに次を足す。
 
-- テストの範囲。書かないと Astra は徹底的に検証する
+- 必要なテストと検証範囲
 - `--mode`。読むだけなら `analysis`、書かせるなら `edit`
 - 指示、ツール定義、履歴、ツール結果を含む入力総量の見積もり。API 従量で割増を避ける場合は、前述の 272K の境界と実行中の増加を考慮して材料と履歴を絞る
 
@@ -115,7 +108,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --mo
 
 ## 経路 2：multi-agent-dispatch
 
-記号 C（GPT-6.1 Sol）と D（GPT-6 Astra）。`--agents` で絞る。GPT-6.1 Sol や Luna を使うときは、実行前に `run.json` の対象エージェントの `model` と `label` を両方更新する。たとえば C の `model` を `gpt-6.1-sol`、`label` を `GPT-6.1 Sol` にする。`label` はログ、状態表示、総括用プロンプトに使われる。
+新規 run では C が GPT-6.2 Sol、D が GPT-6.2 Astra。`--agents` で絞る。Luna など別のモデルを使う場合や、既存の run でモデルを切り替える場合は、実行前に対象エージェントの `model` と `label` を `run.json` でそろえる。`label` はログ、状態表示、総括用プロンプトに使われる。
 `init --effort` は全員の実行・レビューに同じ段がかかる（総括は別設定）。GPT だけ変えるなら `run.json` の対象エージェントの `effort` を `{"run":"medium","review":"medium"}` のように段階ごとに書く。作者が指定した段や、このスキルで理由を持って選んだ段があれば、その値を使う。
 
 ## 提案の書き方
@@ -124,7 +117,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task-file <path> --mo
 
 ## してはいけないこと
 
-- Astra に `none` を指定する
+- GPT-6.2 Astra / Sol に `none` を指定する
 - Anthropic の effort 計測値を GPT に当てはめて書く
 - API 単価を ChatGPT ログインの費用として作者に伝える
 - API 従量の割増を避ける際に、材料だけを数えて入力総量が 272K 未満だと判断する

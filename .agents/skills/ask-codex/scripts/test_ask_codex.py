@@ -65,9 +65,9 @@ class AuthAndModelTests(unittest.TestCase):
         self.assertFalse(ask.parse_codex_auth(0, "")[0])
 
     def test_model_aliases_and_ids(self):
-        self.assertEqual(ask.resolve_model("astra"), ("gpt-6-astra", "GPT-6 Astra"))
-        self.assertEqual(ask.resolve_model("Sol"), ("gpt-6.1-sol", "GPT-6.1 Sol"))
-        self.assertEqual(ask.resolve_model("gpt-6.1-sol")[0], "gpt-6.1-sol")
+        self.assertEqual(ask.resolve_model("astra"), ("gpt-6.2-astra", "GPT-6.2 Astra"))
+        self.assertEqual(ask.resolve_model("Sol"), ("gpt-6.2-sol", "GPT-6.2 Sol"))
+        self.assertEqual(ask.resolve_model("gpt-6.2-sol")[0], "gpt-6.2-sol")
         with self.assertRaises(SystemExit):
             ask.resolve_model("nova")
 
