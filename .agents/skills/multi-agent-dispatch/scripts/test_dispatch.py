@@ -12,6 +12,7 @@ import importlib.util
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 _spec = importlib.util.spec_from_file_location("dispatch", Path(__file__).with_name("dispatch.py"))
 dispatch = importlib.util.module_from_spec(_spec)
@@ -167,7 +168,7 @@ class TemplateTests(unittest.TestCase):
         common = dict(TASK="t", RUN_DIR="d", **dispatch.agent_vars(run))
         rendered = [
             dispatch.render("task.md", MODE_NOTE="m", **common),
-            dispatch.render("review.md", RESULTS="r", **common),
+            dispatch.render("review.md", RESULTS="r", BASE_COMMIT="abc123", **common),
             dispatch.render("synthesis.md", RESULTS="r", REVIEWS="v", AGENT_TABLE="tbl", **common),
         ]
         for text in rendered:
@@ -176,20 +177,43 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("2 体の成果", rendered[1])
         self.assertIn("エージェント A、エージェント B、エージェント C", rendered[2])
 
-    def test_review_is_adversarial(self):
-        # レビューは成果を壊す役割で、長所や順位を書かせない。見つからなければそう書かせる
+    def test_review_and_synthesis_use_evidence_from_the_run(self):
         run = {"agents": {"A": {}, "B": {}, "C": {}}}
-        review = dispatch.render("review.md", TASK="t", RESULTS="r", RUN_DIR="d", **dispatch.agent_vars(run))
-        for heading in ("## エージェント X への攻撃", "### 判定", "### 致命的・重大な欠陥", "### 崩れる前提",
-                        "### 検証した事実", "### 崩せなかった点", "## 自分の成果の見直し", "## 生き残った案と確信度"):
-            self.assertIn(f"`{heading}`", review)
-        self.assertIn("「崩せなかった」と書く", review)
-        self.assertNotIn("長所", review)
-        self.assertNotIn("順位", review)
-        synthesis = dispatch.render("synthesis.md", TASK="t", RESULTS="r", REVIEWS="v", AGENT_TABLE="tbl",
-                                    **dispatch.agent_vars(run))
-        self.assertIn("敵対的にレビュー", synthesis)
-        self.assertIn("反証されていない攻撃", synthesis)
+        common = dict(TASK="t", RESULTS="r", RUN_DIR="docs/agent-runs/example", **dispatch.agent_vars(run))
+        review = dispatch.render("review.md", BASE_COMMIT="abc123", **common)
+        self.assertIn("`abc123`", review)
+        self.assertIn("`## エージェント X のレビュー`", review)
+        self.assertIn("`Final Result: REJECTED`", review)
+        self.assertIn("`Final Result: APPROVED`", review)
+        self.assertIn("`## 自分の成果の見直し`", review)
+        synthesis = dispatch.render("synthesis.md", REVIEWS="v", AGENT_TABLE="tbl", **common)
+        self.assertIn("`docs/agent-runs/example/results/<記号>.patch`", synthesis)
+        self.assertIn("修正対象、棄却、保留", synthesis)
+
+
+class ReviewPermissionTests(unittest.TestCase):
+    def test_review_of_an_implementation_uses_read_only_settings_on_resume(self):
+        run = {
+            "mode": "implement",
+            "effort": {"review": "high"},
+            "claude": {
+                "permission_mode": {"analysis": "auto", "implement": "auto"},
+                "allowed_tools": {"analysis": ["Read"], "implement": ["Read", "Edit", "Write"]},
+            },
+            "codex": {"sandbox": {"analysis": "read-only", "implement": "workspace-write"}},
+        }
+        cwd = Path(".")
+        with patch.object(dispatch, "find_codex", return_value="codex"), \
+             patch.object(dispatch, "_run", return_value=(0, "", "")) as execute:
+            dispatch.call_agent(run, {"vendor": "codex", "model": "m"}, "review", "p", cwd, "C1")
+            command = execute.call_args.args[0]
+            self.assertEqual(command[:3], ["codex", "exec", "resume"])
+            self.assertIn('sandbox_mode="read-only"', command)
+            self.assertNotIn('sandbox_mode="workspace-write"', command)
+
+        with patch.object(dispatch, "call_claude") as call:
+            dispatch.call_agent(run, {"vendor": "claude", "model": "m"}, "review", "p", cwd, "S1")
+            call.assert_called_once_with("m", "high", "p", cwd, 3600, "auto", ["Read"], "S1")
 
 
 if __name__ == "__main__":

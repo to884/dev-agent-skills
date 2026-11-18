@@ -100,17 +100,16 @@ class TemplateTests(unittest.TestCase):
         self.assertIn("書き換えない", ask.build_prompt("t", "analysis"))
         self.assertIn("コミットはしない", ask.build_prompt("t", "edit"))
 
-    def test_review_prompt_has_all_headings(self):
+    def test_review_prompt_has_findings_and_verdict(self):
         text = ask.build_prompt(ask.NO_INTENT, "analysis", ask.TEMPLATE_REVIEW, TARGET="- `a.py`")
         self.assertNotIn("$", text)
-        for heading in REVIEW_HEADINGS:
-            self.assertIn(f"`{heading}`", text)
-        self.assertIn("崩せなかった", text)
+        self.assertIn("- `a.py`", text)
+        self.assertIn("### [Critical / Major / Minor]", text)
+        self.assertIn("`Final Result: REJECTED`", text)
+        self.assertIn("`Final Result: APPROVED`", text)
         self.assertIn("書き換えない", text)
 
 
-REVIEW_HEADINGS = ("## 判定", "## 致命的・重大な欠陥", "## 崩れる前提", "## 見落としと軽微な問題",
-                   "## 検証した事実", "## 崩せなかった点")
 _OK = "\n".join([_line(type="thread.started", thread_id="T1"),
                  _item("agent_message", text="## 判定\n採用可"),
                  _line(type="turn.completed", usage={})])

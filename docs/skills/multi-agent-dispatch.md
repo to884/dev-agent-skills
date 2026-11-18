@@ -15,7 +15,7 @@ python .agents/skills/multi-agent-dispatch/scripts/dispatch.py init --slug desig
 
 1. `init` に依頼を書いた Markdown ファイルとエージェントを渡します。例の `A,C` は Claude Opus 5.5 と GPT-6.1 Sol を指定します。
 2. `run` に `init` が表示した実行ディレクトリを渡します。各エージェントの結果は、その中の `results/` にまとまります。
-3. 必要に応じて、同じディレクトリを `review` と `synthesize` に渡します。`review` は互いの成果から欠陥や反例を探し、`synthesize` は根拠を突き合わせて `summary.md` を書きます。
+3. 必要に応じて、同じディレクトリを `review` と `synthesize` に渡します。`review` は互いの成果から欠陥や反例を探します。`synthesize` は各指摘の反証を試み、問題を確認できた指摘を修正対象として `summary.md` に記録します。覆せた指摘は棄却し、資料が足りない指摘は保留します。
 
 手順 2 と 3 のコマンドでは、`<run-dir>` を `init` が表示したパスに置き換えてください。
 

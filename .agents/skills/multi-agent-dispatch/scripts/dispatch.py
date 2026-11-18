@@ -381,8 +381,8 @@ def call_codex(model: str, effort: str, prompt: str, cwd: Path, timeout: int,
     exe = find_codex()
     common = ["-c", f'model_reasoning_effort="{effort}"', "-c", 'approval_policy="never"', "--json"]
     if resume:
-        # exec resume は -s / -C を持たず、元のセッションの設定を引き継ぐ。
-        cmd = [exe, "exec", "resume", *common, "-m", model, resume, "-"]
+        # exec resume には -s がない。レビューでは実装時のサンドボックスを上書きする。
+        cmd = [exe, "exec", "resume", *common, "-c", f'sandbox_mode="{sandbox}"', "-m", model, resume, "-"]
     else:
         cmd = [exe, "exec", *common, "-m", model, "-s", sandbox, "-C", str(cwd), "-"]
     r.returncode, r.stdout, r.stderr = _run(cmd, prompt, cwd, timeout)
@@ -436,13 +436,13 @@ def call_agent(run: dict, agent: dict, phase: str, prompt: str, cwd: Path,
                resume: str | None) -> CallResult:
     effort = agent.get("effort", {}).get(phase) or run["effort"][phase]
     timeout = int(run.get("timeout_s", 3600))
+    mode = run["mode"] if phase == "run" else "analysis"
     if agent["vendor"] == "claude":
-        mode = run["mode"]
         pm = run["claude"]["permission_mode"][mode]
         tools = run["claude"]["allowed_tools"][mode]
         return call_claude(agent["model"], effort, prompt, cwd, timeout, pm, tools, resume)
     if agent["vendor"] == "codex":
-        sandbox = run["codex"]["sandbox"][run["mode"]]
+        sandbox = run["codex"]["sandbox"][mode]
         return call_codex(agent["model"], effort, prompt, cwd, timeout, sandbox, resume)
     raise ValueError(f"未知のベンダー: {agent['vendor']}")
 
@@ -586,7 +586,7 @@ def run_phase(root: Path, run_dir: Path, run: dict, phase: str, only: list[str] 
         else:
             prompt = render("review.md", TASK=read_text(run_dir / "task.md"),
                             RESULTS=results_for_review(run_dir, run, exclude=key),
-                            RUN_DIR=str(run_dir.relative_to(root)), **agent_vars(run))
+                            RUN_DIR=str(run_dir), BASE_COMMIT=run["base_commit"], **agent_vars(run))
             resume = agent.get("session_id")
         write_text(run_dir / "prompts" / f"{phase}-{key}.md", prompt)
         t = threading.Thread(target=_phase_worker,
@@ -677,15 +677,12 @@ def cmd_synthesize(args: argparse.Namespace) -> None:
     prompt = render("synthesis.md", TASK=read_text(run_dir / "task.md"),
                     RESULTS=all_results(run_dir, run, "results"),
                     REVIEWS=all_results(run_dir, run, "reviews"), AGENT_TABLE=table,
-                    **agent_vars(run))
+                    RUN_DIR=str(run_dir), **agent_vars(run))
     write_text(run_dir / "prompts" / "synthesis.md", prompt)
     preflight({synth["vendor"]})
     agent = {"vendor": synth["vendor"], "model": synth["model"], "label": synth["label"]}
     log(f"総括（{synth['label']}）を開始")
-    saved_mode = run["mode"]
-    run["mode"] = "analysis"  # 総括は常に読み取り専用で走らせる
     res = call_agent(run, agent, "synthesis", prompt, root, None)
-    run["mode"] = saved_mode
     write_text(run_dir / "logs" / "synthesis.stdout.txt", res.stdout)
     write_text(run_dir / "logs" / "synthesis.stderr.txt", res.stderr)
     run["usage"]["synthesis"] = res.usage

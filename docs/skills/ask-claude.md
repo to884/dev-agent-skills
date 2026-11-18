@@ -32,4 +32,6 @@ Fable 5.2 が利用制限に達すると Opus 5.5 で再試行します。この
 python .agents/skills/ask-claude/scripts/ask_claude.py review --diff
 ```
 
+文書や設計、計画をレビューする場合は、資料を `--target` で指定し、確認してほしい要件を `--task-file` で渡せます。結果を受け取ったら、要件の読み違いや既存の対策がないかを確認し、問題を確認できた指摘だけを修正対象にします。情報が足りない指摘は保留します。
+
 [スキル一覧に戻る](../../README.md) · [エージェント向けの手順（SKILL.md）](../../.agents/skills/ask-claude/SKILL.md)
