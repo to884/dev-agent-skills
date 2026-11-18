@@ -3,7 +3,7 @@
 
 Claude の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
-review は、指定したファイルや差分を壊すことを役割とする敵対的レビューを、読み取り専用で頼む。
+review は、指定した対象の欠陥や反例を探す敵対的レビューを、読み取り専用で頼む。
 既定は Opus 5.5。Fable 5.2 を選んで利用制限で使えなければ、Opus 5.5 で同じ依頼をやり直す（--no-fallback で止める）。
 
 使い方:
@@ -674,7 +674,7 @@ def main(argv: list[str] | None = None) -> None:
     _add_call_args(p)
     p.set_defaults(func=cmd_ask)
 
-    p = sub.add_parser("review", help="対象を壊す敵対的レビューを依頼し、最終メッセージを受け取る（常に読み取り専用）")
+    p = sub.add_parser("review", help="対象の欠陥や反例を探す敵対的レビューを依頼する（読み取り専用）")
     p.add_argument("--target", action="append", help="レビュー対象のファイルまたはディレクトリ。繰り返し指定できる")
     p.add_argument("--diff", nargs="?", const="HEAD", metavar="REV",
                    help="git diff REV を取り込んでレビューする（REV を省くと HEAD。未追跡のファイルは含まない）")

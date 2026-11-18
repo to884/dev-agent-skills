@@ -18,7 +18,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task "既存テスト
 
 ## モデルと編集範囲
 
-スクリプトの既定は GPT-6 Astra です。`--model sol` で GPT-6.1 Sol を指定できます。
+スクリプトの既定は GPT-6.2 Astra です。`--model sol` で GPT-6.2 Sol を指定できます。
 既定の `analysis` では読み取り専用で実行します。作業ツリーの編集を許可する場合は `ask --mode edit` を使います。
 モデルと effort の選び方は別ページにまとめています。[openai-model-routing](openai-model-routing.md)
 
@@ -30,5 +30,7 @@ python .agents/skills/ask-codex/scripts/ask_codex.py ask --task "既存テスト
 ```powershell
 python .agents/skills/ask-codex/scripts/ask_codex.py review --diff
 ```
+
+文書や設計、計画をレビューする場合は、資料を `--target` で指定し、確認してほしい要件を `--task-file` で渡せます。結果を受け取ったら、要件の読み違いや既存の対策がないかを確認し、問題を確認できた指摘だけを修正対象にします。情報が足りない指摘は保留します。
 
 [スキル一覧に戻る](../../README.md) · [エージェント向けの手順（SKILL.md）](../../.agents/skills/ask-codex/SKILL.md)

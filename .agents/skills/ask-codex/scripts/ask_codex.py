@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""ask-codex: Claude Code から Codex CLI の GPT-6 Astra または GPT-6.1 Sol に 1 つのタスクを依頼する。
+"""ask-codex: Claude Code から Codex CLI の GPT-6.2 Astra または GPT-6.2 Sol に 1 つのタスクを依頼する。
 
 Codex の最終メッセージだけを標準出力（と --out のファイル）に返す。進行のログは標準エラーに出す。
 長い依頼は --detach で切り離して起動し、wait で受け取る。
-review は、指定したファイルや差分を壊すことを役割とする敵対的レビューを、読み取り専用で頼む。
+review は、指定した対象の欠陥や反例を探す敵対的レビューを、読み取り専用で頼む。
 
 使い方:
   python ask_codex.py check
@@ -41,7 +41,7 @@ TEMPLATE_REVIEW = SKILL_DIR / "templates" / "adversarial.md"
 DIFF_INLINE_LIMIT = 200_000  # 差分をプロンプトへ埋め込む上限（バイト）。超えたらファイルを読ませる。
 NO_INTENT = "（指定なし。対象から読み取れる目的を仮定し、仮定であることを書く）"
 
-MODELS = {"astra": ("gpt-6-astra", "GPT-6 Astra"), "sol": ("gpt-6.1-sol", "GPT-6.1 Sol")}
+MODELS = {"astra": ("gpt-6.2-astra", "GPT-6.2 Astra"), "sol": ("gpt-6.2-sol", "GPT-6.2 Sol")}
 DEFAULT_MODEL = "astra"
 EFFORTS = ("medium", "high", "xhigh")
 DEFAULT_EFFORT = "high"
@@ -606,7 +606,7 @@ def main(argv: list[str] | None = None) -> None:
     _add_call_args(p)
     p.set_defaults(func=cmd_ask)
 
-    p = sub.add_parser("review", help="対象を壊す敵対的レビューを依頼し、最終メッセージを受け取る（常に読み取り専用）")
+    p = sub.add_parser("review", help="対象の欠陥や反例を探す敵対的レビューを依頼する（読み取り専用）")
     p.add_argument("--target", action="append", help="レビュー対象のファイルまたはディレクトリ。繰り返し指定できる")
     p.add_argument("--diff", nargs="?", const="HEAD", metavar="REV",
                    help="git diff REV を取り込んでレビューする（REV を省くと HEAD。未追跡のファイルは含まない）")

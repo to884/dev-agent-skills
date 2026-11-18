@@ -8,7 +8,7 @@ description: Codex から、Claude Code CLI の Claude Opus 5.5 または Claude
 Claude Code CLI（`claude -p`）に 1 つのタスクを渡し、最終メッセージだけを受け取る。
 モデルは Claude Opus 5.5（既定）と Claude Fable 5.2、effort は medium、high、xhigh から選ぶ。
 Fable 5.2 を選んで利用制限で使えなければ、Opus 5.5 に切り替えて依頼をやり直す。
-対象を壊すことを役割とする敵対的レビューは `review` で頼む（下の「敵対的レビュー」）。
+対象の欠陥や反例を探す敵対的レビューは `review` で頼む（下の「敵対的レビュー」）。
 
 ## 手順
 
@@ -57,8 +57,7 @@ python .agents/skills/ask-claude/scripts/ask_claude.py wait <file>
 
 ## 敵対的レビュー
 
-`review` は、指定した対象を壊すことを役割とするレビューを頼む。レビュアーは対象を褒めず、改善案も出さない。欠陥、反例、崩れる前提を、重大度と根拠を添えて並べる。
-欠陥が見つからなければ「崩せなかった」と書くよう指示してあるので、指摘の数で対象の良し悪しを測らない。
+`review` は、文書、設計、計画、コードなどを対象に、要件や資料に照らして欠陥や反例を探す。報告の形式と確認する観点は [templates/adversarial.md](templates/adversarial.md) にある。
 
 ```powershell
 python .agents/skills/ask-claude/scripts/ask_claude.py review --target src/parser.py --target docs/design.md --task-file <path>
@@ -72,8 +71,15 @@ python .agents/skills/ask-claude/scripts/ask_claude.py review --diff main..HEAD 
 - `--task` / `--task-file` で、対象が果たすべき目的を渡す（任意）。省くと、レビュアーは目的を仮定し、仮定であることを書く。
 - 常に読み取り専用の依頼として走る。`--mode` と `--allow` は無く、事前承認するのは `analysis` と同じ読み取り系の道具だけである。`--model`、`--effort`、`--out`、`--detach`、`--resume`、`--cwd`、`--timeout`、`--no-fallback` は `ask` と同じで、Fable 5.2 が利用制限で止まったときの Opus 5.5 への切り替えも同じに働く。切り離したら `wait` で受け取る。
 
-最終メッセージは `## 判定`（採用可、条件付きで採用可、却下と確信度）、`## 致命的・重大な欠陥`、`## 崩れる前提`、`## 見落としと軽微な問題`、`## 検証した事実`、`## 崩せなかった点` の順に並ぶ。
-指摘は根拠を確かめてから採る。「推測」と書かれた指摘は、確かめるまで採らない。
+最終メッセージは、指摘ごとの重大度、対象、根拠、問題、検証方法、修正の方向性を含む。レビュアーの判定は末尾の `Final Result: APPROVED` または `Final Result: REJECTED` に示される。
+
+### 修正前の反証
+
+レビューを受け取った担当者は、各指摘について、修正に着手する前に反証を試みる。要件の読み違い、実際には起こりえない条件、既存の対策など、指摘を覆す根拠がないかを調べる。要件、該当箇所、検証結果に照らして判断し、その根拠を記録する。
+
+- 問題を確認できた場合は、修正対象とする。修正は依頼の範囲に含まれる場合に行う。
+- 指摘を覆す根拠を確認できた場合は、指摘を棄却する。
+- 情報が足りず判断できない場合は、追加で確認することを記録して保留する。
 
 ## 注意
 
