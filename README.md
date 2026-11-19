@@ -18,7 +18,7 @@ Claude Code と Codex で使う Agent Skills をまとめたリポジトリで�
 
 | スキル | 使う場面 |
 | --- | --- |
-| [deep-dive](docs/skills/deep-dive.md) | 複数の問いを並列で Web 調査し、出典付きのレポートにまとめる |
+| [deep-dive](docs/skills/deep-dive.md) | 質問に応じて調査の規模を選び、出典付きで回答する |
 | [git-conventions](docs/skills/git-conventions.md) | ブランチ名、コミットメッセージ、プルリクエストをリポジトリの規約にそろえる |
 
 ### 日本語文書と応答
